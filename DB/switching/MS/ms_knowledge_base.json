@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco Meraki MS130 and MS150 Series switches (native Meraki cloud-managed access switches — distinct from the Catalyst 9200L-M/9300L-M hybrid Meraki-managed models, which live in their own C9200/C9300 KB files). Carries the catalog (atomic SKU facts), groups (named shared compatibility sets), and switch models for MS130 (compact access) and MS150 (stackable access). MS130 (11 models: 8/8P/8P-I/8X/12X/24/24P/24X/48/48P/48X) and MS150 (12 models: 24T-4G/24P-4G/24T-4X/24P-4X/24MP-4X/48T-4G/48LP-4G/48FP-4G/48T-4X/48LP-4X/48FP-4X/48MP-4X) are both fully complete: licensing catalog/groups, stacking cables (MS150 only), and switch models. Structure: catalog + groups + models.",
@@ -643,116 +643,139 @@
       {
         "id": "ms130-8-psu",
         "members": ["MS130-8-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed external power brick on MS130-8. Single-member group: no PSU bay, no FRU, no redundancy pair — exists only so the standard power_supplies shape applies (same rationale as the C9200CX single-member PSU groups)."
       },
       {
         "id": "ms130-8p-psu",
         "members": ["MS130-8P-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed external power brick on MS130-8P. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-8p-i-psu",
         "members": ["MS130-8P-I-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal AC supply on MS130-8P-I. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-8x-psu",
         "members": ["MS130-8X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed external power brick on MS130-8X. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-12x-psu",
         "members": ["MS130-12X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed external power brick on MS130-12X. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-24-psu",
         "members": ["MS130-24-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-24. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-24p-psu",
         "members": ["MS130-24P-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-24P. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-24x-psu",
         "members": ["MS130-24X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-24X. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-48-psu",
         "members": ["MS130-48-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-48. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-48p-psu",
         "members": ["MS130-48P-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-48P. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms130-48x-psu",
         "members": ["MS130-48X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS130-48X. Single-member group, same rationale as ms130-8-psu."
       },
       {
         "id": "ms150-24t-4g-psu",
         "members": ["MS150-24T-4G-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-24T-4G. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-24p-4g-psu",
         "members": ["MS150-24P-4G-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-24P-4G. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-24t-4x-psu",
         "members": ["MS150-24T-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-24T-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-24p-4x-psu",
         "members": ["MS150-24P-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-24P-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-24mp-4x-psu",
         "members": ["MS150-24MP-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-24MP-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48t-4g-psu",
         "members": ["MS150-48T-4G-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48T-4G. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48lp-4g-psu",
         "members": ["MS150-48LP-4G-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48LP-4G. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48fp-4g-psu",
         "members": ["MS150-48FP-4G-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48FP-4G. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48t-4x-psu",
         "members": ["MS150-48T-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48T-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48lp-4x-psu",
         "members": ["MS150-48LP-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48LP-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48fp-4x-psu",
         "members": ["MS150-48FP-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48FP-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       },
       {
         "id": "ms150-48mp-4x-psu",
         "members": ["MS150-48MP-4X-PSU-SYN"],
+        "bays": 0,
         "notes": "Fixed internal supply on MS150-48MP-4X. Single-member group, same rationale as ms130-8-psu (no bay, no FRU, no redundancy pair)."
       }
     ],

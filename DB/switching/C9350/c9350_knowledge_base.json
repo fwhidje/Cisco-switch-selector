@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco Catalyst C9350 Series Smart Switches. Pass 1 of 2: this file carries the catalog (atomic SKU facts) and groups (named shared compatibility sets) — the reusable scaffolding. Switch models are added in Pass 2; until then 'models' is empty. All C9350 models are modular-uplink (uplink ports come from a fitted network module). Structure: catalog + groups + models.",
@@ -340,6 +340,7 @@
       {
         "id": "c9350-psus",
         "members": ["PWR-C2-500WAC-I", "PWR-C2-850WAC-I", "PWR-C2-1600WAC-I"],
+        "bays": 3,
         "secondary_none_option": "C9350-SPS-NONE",
         "notes": "Cisco C9350 Config-2 AC PSU family (datasheet Table 8 / OG Table 4, -I port-inlet SKUs). The chassis has 3 PSU bays (N+1); which member is a valid PRIMARY, the default shipped PSU, and the PoE budget per PSU combination are switch-specific and live on the model entry (Pass 2). Excludes ordering variants (-IUP primary-upgrade, /2 redundant, = spare)."
       }
@@ -861,7 +862,7 @@
               "primary": "PWR-C2-850WAC-I",
               "secondary": "PWR-C2-850WAC-I",
               "tertiary": "PWR-C2-1600WAC-I",
-              "poe_budget_watts": 3670
+              "poe_budget_watts": 3220
             },
             {
               "primary": "PWR-C2-850WAC-I",
@@ -1097,8 +1098,157 @@
           "group": "c9350-psus",
           "valid_primary": ["PWR-C2-850WAC-I", "PWR-C2-1600WAC-I"],
           "default_primary": "PWR-C2-850WAC-I",
-          "poe_budget_matrix": [],
-          "matrix_provenance": "UNCONFIRMED \u2014 48HM is absent from datasheet Table 9. poe_budget_watts (4320W) is from the 48HM datasheet page; the per-PSU matrix and default/valid PSU are not sourced. See THINGS-TO-COMPLETE.md."
+          "poe_budget_matrix": [
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": null,
+              "poe_budget_watts": 470
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 970
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 1320
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 2070
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 1470
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 1820
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 2570
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 1820
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 2170
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 3220
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 2570
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 3220
+            },
+            {
+              "primary": "PWR-C2-850WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 4320
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": null,
+              "poe_budget_watts": 1220
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 1720
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 1970
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 2820
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 2220
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 2570
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-500WAC-I",
+              "poe_budget_watts": 3320
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 2570
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 2920
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-850WAC-I",
+              "poe_budget_watts": 3670
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-500WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 3320
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-850WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 3670
+            },
+            {
+              "primary": "PWR-C2-1600WAC-I",
+              "secondary": "PWR-C2-1600WAC-I",
+              "tertiary": "PWR-C2-1600WAC-I",
+              "poe_budget_watts": 4320
+            }
+          ],
+          "matrix_provenance": "TO BE CONFIRMED - derived by analogy from C9350-48HXN (both 48-port UPOE+, 4320W, valid_primary [850W, 1600W], default 850W); the single corrected 48HXN row (850+850+1600 = 3220W) is carried over. 48HM is absent from datasheet Table 9 and not yet configurable in CCW; its slower PHYs (1/2.5G vs the 48HXN 1/2.5/5/10G) imply system overhead no higher than the 48HXN, so copying the 48HXN budgets under-promises rather than over-promises. Replace with 48HM-specific values once Table 9 or CCW lists them. See THINGS-TO-COMPLETE.md."
         },
         "license": {
           "group": "c9350-unified-essentials-l",

@@ -105,7 +105,9 @@ js/ui/       DOM only — three renderings of the one contract
   8×10" — 16 ports — fails).
 - **Defaulting policy is code, but named and visible.** The `psu-default` policy (ship
   `default_primary`; add a secondary to meet a PoE load; upsize only when no secondary covers it;
-  redundancy forces a matched pair; triple forces a tertiary row) and the cable defaults
+  redundancy populates a second bay, triple a third — how many fit is the group's `bays` count,
+  what a set delivers is the PoE matrix, and PSUs beyond the load add redundancy not sourced watts)
+  and the cable defaults
   (`none_option` when optional; when stacking/stackpower is required, the adapter kit's bundled
   cable on kit series — the kit is surfaced as the prerequisite — else the shortest cable) live in
   `resolve.js`. Every

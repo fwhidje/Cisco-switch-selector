@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "switch-kb.schema.json",
   "title": "Networking Equipment Selector — Switch Knowledge Base Schema",
-  "description": "The SINGLE shared shape + authoring contract for every switch-family knowledge base (C9200, C9300, C9350, C9500, C9550, MS). This schema enforces SHAPE (entries are well-formed); switching-axes.json enforces MEANING (which decision variables exist, their KIND/DIMENSION, legal enum values, defaults, and KB bindings); selector/tools/validate-kb.mjs enforces CROSS-REFERENCE INTEGRITY (group references resolve, valid_primary is a subset of the referenced PSU group, poe_budget_watts equals the matrix max, sum of access-port counts equals total_port_count, enum/speed values are registered). All three must pass. Family-specific constructs (access_pair_block, uplink_pair_block, fan_trays, modes, no_uplink_ports, tertiary) are OPTIONAL; each carries an 'Example: <FAMILY>/<id>' pointer in its $comment to a real instance, so an agent can grep for a matching precedent. See $authoring for the procedure to add a model.",
-  "schema_version": "2.0.0",
-  "registry_version": "2.0.0",
+  "description": "The SINGLE shared shape + authoring contract for every switch-family knowledge base (C9200, C9300, C9350, C9500, C9550, MS). This schema enforces SHAPE (entries are well-formed); switching-axes.json enforces MEANING (which decision variables exist, their KIND/DIMENSION, legal enum values, defaults, and KB bindings); selector/tools/validate-kb.mjs enforces CROSS-REFERENCE INTEGRITY (group references resolve, valid_primary is a subset of the referenced PSU group, poe_budget_watts equals the matrix max, no matrix row populates more bays than the group declares, bays >= 2 iff a secondary_none_option exists, PSU-combo wattage is permutation-consistent, sum of access-port counts equals total_port_count, enum/speed values are registered). All three must pass. Family-specific constructs (access_pair_block, uplink_pair_block, fan_trays, modes, no_uplink_ports, tertiary) are OPTIONAL; each carries an 'Example: <FAMILY>/<id>' pointer in its $comment to a real instance, so an agent can grep for a matching precedent. See $authoring for the procedure to add a model.",
+  "schema_version": "3.0.0",
+  "registry_version": "3.0.0",
 
   "$authoring": {
     "_comment": "NON-VALIDATING. Procedure + rules for an agent populating switch models. Read before touching data. Concrete per-field precedents live ON the schema fields: grep the $comment values for 'Example: <FAMILY>/<id>' to find a real instance of any exceptional construct.",
@@ -45,7 +45,7 @@
     "conventions": [
       "Series-specific groups (PSU, cables, fans, licenses) are kept as their own named groups even when membership resembles another series, so they can diverge later.",
       "A group's none_option / secondary_none_option is a 'none selected' sentinel (e.g. <FAMILY>-STACK-NONE), NOT a catalog SKU; present only where that 'none' state is orderable (see the field Examples).",
-      "PSU redundancy is NOT a stored model field: it is a configuration variable (registry 'psu_redundancy') realized as a (primary, secondary) pair with secondary != none. default_primary is the single PSU shipped by default; a secondary is added only to meet a higher PoE load or an explicit redundancy request.",
+      "PSU redundancy is NOT a stored model field: it is a configuration variable (registry 'psu_redundancy') realized by populating a second bay, and 'psu_triple' a third. What the chassis can hold is the power_supply_group's `bays` count (a chassis fact); what a populated set DELIVERS is the poe_budget_matrix (a datasheet fact) — the two are independent and must never be derived from each other. default_primary is the single PSU shipped by default; additional bays draw from the group's members (the group IS the per-chassis compatibility list; valid_primary restricts only the PRIMARY role).",
       "License TERM is a configuration variable (binding: term_variable.choices_years; must_resolve) resolving the concrete subscription SKU; License TIER is a model-dimension variable (must_resolve) derived from the model's license groups."
     ]
   },
@@ -323,14 +323,19 @@
 
     "power_supply_group": {
       "type": "object",
-      "description": "Complete orderable PSU family for a series. Which member is a valid PRIMARY and the PoE budget per pair are switch-specific and live on the model.",
-      "required": ["id", "members"],
+      "description": "Complete orderable PSU family for a series. Which member is a valid PRIMARY and the PoE budget per pair are switch-specific and live on the model; membership (what the chassis physically accepts) and bay count are chassis facts and live here.",
+      "required": ["id", "members", "bays"],
       "properties": {
         "id": { "type": "string" },
         "members": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "bays": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "Number of SWAPPABLE PSU bays in the chassis: slots a PSU can be fitted into or removed from. This is the single authority on redundancy capability (bays >= 2) and third-PSU capability (bays >= 3) — NOT the poe_budget_matrix, which only says what a populated set delivers. bays: 0 is an integrated/fixed supply (nothing to swap) even though one supply ships; the chassis still runs, redundancy is simply unavailable. Example: C9350/c9350-psus (3) vs C9200/c9200-psus (2) vs MS/ms130-* and C9200CX internal (0)."
+        },
         "secondary_none_option": {
           "type": "string",
-          "$comment": "'None selected' sentinel for the secondary PSU (NOT a catalog SKU). Present only for a chassis with a secondary PSU bay; omitted for fixed / single-PSU chassis. Example: C9200/C9200CX-* and MS (no secondary bay -> field omitted)."
+          "$comment": "'None selected' sentinel for the secondary PSU (NOT a catalog SKU). Present when bays >= 2 (a secondary bay exists to decline); omitted for bays: 0 fixed / integrated-supply chassis. Bay count is the authority — see the `bays` field. Example: C9200/C9200CX-* and MS (bays: 0 -> field omitted)."
         },
         "notes": { "type": "string" }
       },
@@ -652,6 +657,11 @@
           "type": "string",
           "$comment": "The single PSU the switch ships with by default. Must be a member of valid_primary (validator-checked)."
         },
+        "bays": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "Optional per-model override of the PSU group's `bays` count, for the rare chassis whose bay count differs from its family group. Absent = inherit the group's `bays`. Same meaning as power_supply_group.bays."
+        },
         "poe_budget_matrix": {
           "type": "array",
           "items": { "$ref": "#/$defs/poe_matrix_row" }
@@ -669,7 +679,7 @@
         "secondary": { "type": ["string", "null"] },
         "tertiary": {
           "type": ["string", "null"],
-          "$comment": "Optional THIRD PSU (chassis with 3 bays); present only on combos needing a third PSU to reach the stated budget. Example: C9350/C9350-48HX (3x1600W -> 4320W)."
+          "$comment": "Optional THIRD PSU: a capacity fact only — the wattage a three-PSU set delivers. Its ABSENCE means the datasheet published no higher budget for a third PSU (the 2-PSU set already saturates), NOT that a third bay is unavailable — bay count lives on power_supply_group.bays. Rows carry a tertiary only where the third PSU raises the budget. Example: C9350/C9350-48HX (3x1600W -> 4320W)."
         },
         "poe_budget_watts": { "type": "integer", "minimum": 0 }
       },

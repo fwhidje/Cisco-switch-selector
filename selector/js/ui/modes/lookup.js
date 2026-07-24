@@ -214,15 +214,24 @@ export function mount(root, ctx) {
       const dc = bom.power.default_config;
       const matrix = bom.power.poe_budget_matrix ?? [];
       const primaries = bom.power.valid_primary ?? [];
+      // Bays (a chassis fact) drive redundancy — NOT the matrix. bays >= 2: a spare
+      // bay accepts any group member; bays: 0: integrated supply, no redundancy.
+      const bays = bom.power.bays ?? 0;
+      const addOpts = bom.power.additional_bay_options ?? [];
+      const maxAdd = bom.power.max_additional ?? 0;
+      const baysNote = bays === 0 ? "integrated supply (no PSU bay)" : `${bays} PSU bays`;
+      const ships = dc
+        ? ` — ships as ${[dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ")} (${dc.reason})`
+        : "";
       if (matrix.length) {
         // PoE model: each row is one orderable (primary[,secondary[,tertiary]]) arrangement.
+        const prov = bom.power.poe_budget_matrix_unconfirmed
+          ? " · budget UNCONFIRMED (derived, not datasheet-sourced)"
+          : "";
         const note = el(
           "p",
           "lookup-note",
-          `valid primary: ${primaries.join(", ") || "—"} · default: ${bom.power.default_primary}` +
-            (dc
-              ? ` — ships as ${[dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ")} (${dc.reason})`
-              : ""),
+          `${baysNote} · valid primary: ${primaries.join(", ") || "—"} · default: ${bom.power.default_primary}${ships}${prov}`,
         );
         const rows = matrix.map((m) => [
           m.primary,
@@ -237,19 +246,19 @@ export function mount(root, ctx) {
             table(["primary", "secondary", "tertiary", "PoE budget"], rows),
           ),
         );
-      } else if (bom.power.secondary_none_option != null) {
-        // Non-PoE but dual-bay: no PoE budget to tabulate, but a second PSU can
-        // be fitted for redundancy (a matched pair). Show both slots by role.
+      } else if (bays >= 2) {
+        // Multi-bay, no PoE budget to tabulate: up to `maxAdd` more PSU(s) may be
+        // fitted for redundancy. Options are the group members (the compatibility list).
         const note = el(
           "p",
           "lookup-note",
-          `Ships as a single ${bom.power.default_primary}. A second PSU may be added for redundancy (matched pair); default is a single supply.`,
+          `${baysNote} · ships as a single ${bom.power.default_primary}; up to ${maxAdd} more PSU${maxAdd === 1 ? "" : "s"} may be added for redundancy${ships}`,
         );
         const primaryOpts =
           primaries
             .map((p) => (p === bom.power.default_primary ? `${p} (default)` : p))
             .join(", ") || "—";
-        const secondaryOpts = `none — single (default) · matched pair: ${primaries.join(" / ") || "—"}`;
+        const addLabel = `none — single (default) · additional: ${addOpts.join(" / ") || "—"}`;
         out.appendChild(
           section(
             "PSU options",
@@ -258,20 +267,20 @@ export function mount(root, ctx) {
               ["slot", "options"],
               [
                 ["primary", primaryOpts],
-                ["secondary (redundancy)", secondaryOpts],
+                [`additional (${maxAdd} bay${maxAdd === 1 ? "" : "s"})`, addLabel],
               ],
             ),
           ),
         );
       } else {
-        // True single-bay / fixed supply: no secondary to offer.
+        // Integrated / fixed supply (bays: 0): no bay to add a PSU to.
         out.appendChild(
           section(
             "PSU",
             el(
               "p",
               "lookup-note",
-              `${bom.power.default_primary} — single fixed supply (no redundancy bay).`,
+              `${bom.power.default_primary} — integrated supply (no PSU bay, no redundancy).`,
             ),
           ),
         );

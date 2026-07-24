@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco Catalyst 9500 Series Switches (C9500 and C9500X). Pass 2 of 2: catalog, groups, and models are all populated. C9500/C9500X are fixed 1RU switches (no modular chassis/supervisor/line-card concept); only C9500-16X (excluded, see design_notes) ever had a network-module bay, so the live lineup is fixed-uplink only. Structure: catalog + groups + models.",
@@ -302,12 +302,14 @@
           "C9K-PWR-1600WAC-R",
           "C9K-PWR-1600WDC-R"
         ],
+        "bays": 2,
         "secondary_none_option": "C9500-SPS-NONE",
         "notes": "Complete live PSU family for non-X C9500 (datasheet Table 12 / Table 14). Per-model valid_primary (C9500-32C: 1600W pair only; C9500-32QC/48Y4C/24Y4C: 650W AC / 930W DC) is set in Pass 2. Excludes PWR-C4-950WAC-R/950WDC-R (C9500-16X-only, excluded model) and C9K-PWR-650WACL-R (dropped per project ruling)."
       },
       {
         "id": "c9500x-psus",
         "members": ["C9K-PWR-1500WAC", "C9K-PWR-1500WDC"],
+        "bays": 2,
         "secondary_none_option": "C9500-SPS-NONE",
         "notes": "Complete PSU family for C9500X (datasheet Table 10 / Table 11), shared identically by both C9500X-28C8D and C9500X-60L4D."
       }

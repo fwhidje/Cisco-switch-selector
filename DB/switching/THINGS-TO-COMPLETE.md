@@ -14,7 +14,7 @@ invented; placeholders are clearly marked in-file.
 
 | Model | Field(s) | Why incomplete | Where to source |
 |---|---|---|---|
-| `C9350-48HM` | `poe_budget_matrix`, `default_primary` | 48HM is absent from datasheet **Table 9** (PoE budget per PSU), and not in the ordering guide. Only the headline `poe_budget_watts` (4320W) is sourced (48HM datasheet page). `poe_budget_matrix` is left empty; `valid_primary`/`default_primary` are placeholders. | CCW (Cisco Commerce) PoE/PSU config, or a future datasheet revision that adds 48HM to Table 9. |
+| `C9350-48HM` | `poe_budget_matrix`, `default_primary` | 48HM is absent from datasheet **Table 9** (PoE budget per PSU), and not in the ordering guide. Only the headline `poe_budget_watts` (4320W) is sourced (48HM datasheet page). `poe_budget_matrix` is now **derived by analogy from C9350-48HXN** (both 48-port UPOE+/4320W, same PSU set) and flagged **TO BE CONFIRMED** in `matrix_provenance` — no longer empty, but not first-party sourced; `valid_primary`/`default_primary` remain placeholders. | CCW (Cisco Commerce) PoE/PSU config, or a future datasheet revision that adds 48HM to Table 9. |
 | `C9350-24Y` | `default_primary` | 24Y (non-PoE fiber) is not in the ordering guide; its default PSU is not stated. `default_primary` (and `valid_primary`) are placeholders (`PWR-C2-500WAC-I`). | CCW default-PSU for 24Y. |
 | `C9350-12Y` | `default_primary` | 12Y (non-PoE fiber) is not in the ordering guide; its default PSU is not stated. `default_primary` (and `valid_primary`) are placeholders (`PWR-C2-500WAC-I`). | CCW default-PSU for 12Y. |
 
@@ -89,7 +89,7 @@ here is unsourced.
 
 ### Notes
 - `C9500-32C`'s ports are correctly modeled but needed a new opt-in model
-  flag, `no_uplink_ports: true` (see `DB/switching/C9500/switch-kb.schema.json`
+  flag, `no_uplink_ports: true` (see `DB/switching/switch-kb.schema.json`
   and `selector/tools/validate-kb.mjs`), since it's the only C9500 model with
   no Cisco-labeled uplink port subset despite `uplink_modular: false`.
 - `C9500-12Q`/`24Q`/`40X` (datasheet end-of-sale, Dec 2024), `C9500-16X` +

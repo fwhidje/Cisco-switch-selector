@@ -184,7 +184,8 @@ export function satisfiesScalar(value, c, variable) {
  * rule, and must_resolve. Skipped by design: identity (model_id — its open
  * domain IS the candidate list), parametrised port variables (capability lives
  * in the candidates' port pools), and variables with no accepted conditions
- * (psu_config — per-candidate only, its domain is each candidate's PSU matrix).
+ * (psu_config — per-candidate only, its domain is each candidate's PSU group
+ * members over its bay count).
  */
 export function openVariables(query, survivors, registry) {
   const out = [];

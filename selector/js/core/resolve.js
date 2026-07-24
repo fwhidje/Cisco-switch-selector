@@ -232,181 +232,180 @@ function resolveUplinkBOM(model, validOptions) {
   return { modular, default: dflt?.id ?? null, options: opts };
 }
 
-// PSU redundancy is NOT a stored axis: it is a (primary, secondary) pair with a
-// secondary fitted. For PoE models the pairs come straight from the PoE matrix;
-// for non-PoE models redundancy is pairing two PSUs from the valid-primary set.
+// What the chassis can HOLD (bays, member PSUs) is a chassis fact on the PSU
+// group; what a populated set DELIVERS is the datasheet poe_budget_matrix. The
+// two are independent — redundancy capability is `bays >= 2`, NOT "the matrix has
+// a row with a secondary". A spare bay accepts any group member (the group is the
+// per-chassis compatibility list); valid_primary restricts only the PRIMARY role.
 function resolvePower(model, query, kb) {
   const ps = model.configurables?.power_supplies;
   if (!ps) return null;
   const group = getPowerSupplyGroup(kb, ps.group);
+  const bays = ps.bays ?? group?.bays ?? 0; // per-model override, else group, else integrated
   const need = numericMin(query, "poe_budget_watts");
   const redundancy = pickValue(query, "psu_redundancy") === true;
   const triple = pickValue(query, "psu_triple") === true;
   const matrix = ps.poe_budget_matrix ?? [];
   const rows = need == null ? matrix : matrix.filter((r) => r.poe_budget_watts >= need);
-  const poe = matrix.length > 0;
+  // A matrix flagged _incomplete carries derived-not-sourced numbers: never turn
+  // an unsourced blank into a confident "does not meet" — meets stays null.
+  const matrixUnconfirmed = (model._incomplete ?? []).includes("poe_budget_matrix");
 
-  return {
+  const out = {
     group: ps.group,
+    bays,
+    populated_by_default: 1, // the kitlist ships exactly the default_primary
     valid_primary: ps.valid_primary ?? [],
     default_primary: ps.default_primary,
+    additional_bay_options: bays >= 2 ? (group?.members ?? []) : [],
+    max_additional: bays === 0 ? 0 : Math.max(bays - 1, 0),
     secondary_none_option: group?.secondary_none_option,
-    redundant_capable: poe ? matrix.some((r) => r.secondary != null) : true,
-    default_config: chooseDefaultPsu(ps, kb, need, redundancy, triple),
+    default_config: chooseDefaultPsu(ps, kb, need, redundancy, triple, bays),
     poe_budget_matrix: rows,
-    meets_requested_budget: need == null ? null : rows.length > 0,
+    meets_requested_budget: need == null || matrixUnconfirmed ? null : rows.length > 0,
   };
+  // Provenance passthrough (zero logic): let a client tell a sourced blank from an
+  // unsourced one, and a datasheet matrix from a derived-by-analogy one.
+  if (ps.matrix_provenance != null) out.matrix_provenance = ps.matrix_provenance;
+  if (matrixUnconfirmed) out.poe_budget_matrix_unconfirmed = true;
+  return out;
 }
 
-// Resolve the default PSU config from default_primary.
-//   triple: force a tertiary-equipped row (primary+secondary+tertiary), regardless
-//     of the redundancy toggle — a third PSU is itself the strongest redundancy ask.
-//   redundancy OFF: ship a single PSU; to reach a higher PoE load ADD a secondary;
-//     upsize the primary only when no secondary covers it (min primary, then secondary).
-//   redundancy ON: a true backup must at least MATCH the primary, so default to a
-//     matched pair (secondary == primary); prefer keeping the default primary and the
-//     smallest matched pair that still meets the load. If that pair would NOT survive
-//     losing one PSU at the requested load (single-PSU capacity < need), and the KB
-//     sources a tertiary-equipped row for that same pair, upgrade to it (real N+1).
-function chooseDefaultPsu(ps, kb, need, redundancy, triple) {
+// Resolve the default PSU config as (primary [, secondary [, tertiary]]) + reason.
+// Two independent facts drive it, never derived from each other:
+//   - the poe_budget_matrix decides which PSUs the requested PoE LOAD needs (the
+//     "PoE base") and what a populated set DELIVERS — a datasheet fact;
+//   - the chassis `bays` count decides how many PSUs FIT; redundancy/triple say how
+//     many the caller WANTS — chassis / intent facts.
+// fitted = bays === 0 ? 1 : min(max(nPoe, nAsked), bays). PSUs beyond the PoE base
+// are redundancy / StackPower headroom: they never invent watts — the reported
+// budget is the best SOURCED matrix row that is a subset of what is installed.
+function chooseDefaultPsu(ps, kb, need, redundancy, triple, bays) {
   const dp = ps.default_primary;
   const matrix = ps.poe_budget_matrix ?? [];
   const w = (id) => (id == null ? 0 : (getPowerSupply(kb, id)?.watts ?? 0));
   const meets = (r) => need == null || r.poe_budget_watts >= need;
-  const singleCapacity = (id) =>
-    matrix.find((m) => m.primary === id && m.secondary == null)?.poe_budget_watts ?? w(id);
+  const psusOf = (c) => [c.primary, c.secondary, c.tertiary].filter((x) => x != null);
 
-  if (triple) {
-    const cand = matrix.filter((r) => r.tertiary != null && meets(r));
-    if (!cand.length) return null;
-    cand.sort(
-      (a, b) =>
-        (a.primary === dp ? 0 : 1) - (b.primary === dp ? 0 : 1) ||
-        w(a.primary) - w(b.primary) ||
-        w(a.secondary) - w(b.secondary) ||
-        w(a.tertiary) - w(b.tertiary),
-    );
-    const r = cand[0];
-    return {
-      primary: r.primary,
-      secondary: r.secondary,
-      tertiary: r.tertiary,
-      watts: r.poe_budget_watts,
-      reason: "triple PSU required",
-    };
+  // PoE base: the set the matrix requires for `need`, ignoring redundancy intent.
+  // This is the previous no-flag policy verbatim, so the unflagged path is unchanged.
+  const base = poeBase();
+  if (base == null) return null; // load not satisfiable by this model's PSU options
+
+  const nPoe = psusOf(base).length;
+  const nAsked = triple ? 3 : redundancy ? 2 : 1;
+  const target = bays === 0 ? 1 : Math.min(Math.max(nPoe, nAsked), bays);
+
+  // Integrated supply (no bay): exactly one PSU — a redundancy ask cannot be met.
+  if (bays === 0 && nAsked > 1)
+    return { ...base, reason: "integrated supply — redundancy not available (no PSU bay)" };
+  if (target <= nPoe) return base; // nothing to add: the no-flag / already-sized case
+
+  // Redundancy extension: fill the extra bays with PSUs matching the primary (a
+  // backup must at least match the primary; matching keeps it simplest).
+  const bayList = psusOf(base);
+  while (bayList.length < target) bayList.push(base.primary);
+  const [primary, secondary = null, tertiary = null] = bayList;
+
+  // Reported budget = the best SOURCED matrix row whose PSU multiset is a subset of
+  // what is installed. Equal set => a full sourced row (the extra PSU raises budget);
+  // strict subset => the extras add redundancy, not sourced watts.
+  const subsetRows = matrix.filter((r) => multisetSubset(psusOf(r), bayList));
+  const best = subsetRows.reduce(
+    (r, x) => (x.poe_budget_watts > (r?.poe_budget_watts ?? -1) ? x : r),
+    null,
+  );
+  const fullRow = subsetRows.some((r) => psusOf(r).length === bayList.length);
+  const out = { primary, secondary, tertiary, watts: best ? best.poe_budget_watts : base.watts };
+  if (fullRow) {
+    out.reason = target === 3 ? "triple PSU — sourced three-PSU budget" : "redundant matched pair";
+  } else {
+    if (best)
+      out.watts_basis = `sourced ${psusOf(best).length}-PSU row (${psusOf(best).join(" + ")}); the added PSU(s) supply redundancy, not sourced budget`;
+    out.reason =
+      target === 3
+        ? "third bay populated on request — adds redundancy, not budget"
+        : "redundant matched pair";
   }
+  return out;
 
-  if (redundancy) {
+  // --- helpers ---------------------------------------------------------------
+  function poeBase() {
     if (matrix.length === 0)
       return {
         primary: dp,
-        secondary: dp,
+        secondary: null,
         tertiary: null,
         watts: null,
-        reason: "redundant matched pair (no PoE data)",
+        reason: "default single",
       };
-    // secondary must be at least as large as the primary (real N+1); prefer a 2-PSU
-    // matched pair, then keeping the default primary, then the smallest such pair.
-    const cand = matrix.filter(
-      (r) => r.secondary != null && w(r.secondary) >= w(r.primary) && meets(r),
-    );
-    if (!cand.length) return null;
-    cand.sort(
-      (a, b) =>
-        (a.tertiary ? 1 : 0) - (b.tertiary ? 1 : 0) ||
-        (a.secondary === a.primary ? 0 : 1) - (b.secondary === b.primary ? 0 : 1) ||
-        (a.primary === dp ? 0 : 1) - (b.primary === dp ? 0 : 1) ||
-        w(a.primary) - w(b.primary) ||
-        w(a.secondary) - w(b.secondary),
-    );
-    const pair = cand[0];
-
-    const tolerant = need == null || singleCapacity(pair.primary) >= need;
-    if (!tolerant) {
-      const upgrade = matrix
-        .filter(
-          (r) =>
-            r.tertiary != null &&
-            r.primary === pair.primary &&
-            r.secondary === pair.secondary &&
-            meets(r),
-        )
-        .sort((a, b) => w(a.tertiary) - w(b.tertiary))[0];
-      if (upgrade)
-        return {
-          primary: upgrade.primary,
-          secondary: upgrade.secondary,
-          tertiary: upgrade.tertiary,
-          watts: upgrade.poe_budget_watts,
-          reason:
-            "upgraded to triple PSU — a matched pair alone would not survive a PSU failure at this load",
-        };
+    const dpRows = matrix.filter((r) => r.primary === dp);
+    const dpSingle = dpRows.find((r) => r.secondary == null);
+    if (dpSingle && meets(dpSingle))
+      return {
+        primary: dp,
+        secondary: null,
+        tertiary: null,
+        watts: dpSingle.poe_budget_watts,
+        reason:
+          need == null ? "base default (no PoE budget specified)" : "default single meets load",
+      };
+    // keep the default primary; add the fewest/smallest extra PSUs that meet the load
+    // (prefer a 2-PSU pair over a 3-PSU combo, then the smallest secondary/tertiary).
+    const dpPairs = dpRows
+      .filter((r) => r.secondary != null && meets(r))
+      .sort(
+        (a, b) =>
+          (a.tertiary ? 1 : 0) - (b.tertiary ? 1 : 0) ||
+          w(a.secondary) - w(b.secondary) ||
+          w(a.tertiary) - w(b.tertiary),
+      );
+    if (dpPairs.length) {
+      const r = dpPairs[0];
+      return {
+        primary: dp,
+        secondary: r.secondary,
+        tertiary: r.tertiary ?? null,
+        watts: r.poe_budget_watts,
+        reason: r.tertiary
+          ? "added secondary+tertiary to meet load"
+          : "added secondary to meet load",
+      };
     }
-    return {
-      primary: pair.primary,
-      secondary: pair.secondary,
-      tertiary: pair.tertiary ?? null,
-      watts: pair.poe_budget_watts,
-      reason:
-        pair.secondary === pair.primary
-          ? "redundant matched pair"
-          : "redundant pair (secondary ≥ primary)",
-    };
+    // upsize: fewest PSUs, then smallest primary/secondary/tertiary, that meets the load
+    const feasible = matrix
+      .filter(meets)
+      .sort(
+        (a, b) =>
+          (a.tertiary ? 1 : 0) - (b.tertiary ? 1 : 0) ||
+          w(a.primary) - w(b.primary) ||
+          w(a.secondary) - w(b.secondary) ||
+          w(a.tertiary) - w(b.tertiary),
+      );
+    if (feasible.length) {
+      const r = feasible[0];
+      return {
+        primary: r.primary,
+        secondary: r.secondary,
+        tertiary: r.tertiary ?? null,
+        watts: r.poe_budget_watts,
+        reason: "upsized primary (no secondary covered the load)",
+      };
+    }
+    return null;
   }
 
-  if (matrix.length === 0)
-    return { primary: dp, secondary: null, tertiary: null, watts: null, reason: "default single" };
-  const dpRows = matrix.filter((r) => r.primary === dp);
-  const dpSingle = dpRows.find((r) => r.secondary == null);
-  if (dpSingle && meets(dpSingle))
-    return {
-      primary: dp,
-      secondary: null,
-      tertiary: null,
-      watts: dpSingle.poe_budget_watts,
-      reason: need == null ? "base default (no PoE budget specified)" : "default single meets load",
-    };
-  // keep the default primary; add the fewest/smallest extra PSUs that meet the load
-  // (prefer a 2-PSU pair over a 3-PSU combo, then the smallest secondary/tertiary).
-  const dpPairs = dpRows
-    .filter((r) => r.secondary != null && meets(r))
-    .sort(
-      (a, b) =>
-        (a.tertiary ? 1 : 0) - (b.tertiary ? 1 : 0) ||
-        w(a.secondary) - w(b.secondary) ||
-        w(a.tertiary) - w(b.tertiary),
-    );
-  if (dpPairs.length) {
-    const r = dpPairs[0];
-    return {
-      primary: dp,
-      secondary: r.secondary,
-      tertiary: r.tertiary ?? null,
-      watts: r.poe_budget_watts,
-      reason: r.tertiary ? "added secondary+tertiary to meet load" : "added secondary to meet load",
-    };
+  // Is multiset `a` contained in multiset `b`? (PSU SKU ids, order-independent.)
+  function multisetSubset(a, b) {
+    const cnt = new Map();
+    for (const x of b) cnt.set(x, (cnt.get(x) ?? 0) + 1);
+    for (const x of a) {
+      const c = cnt.get(x) ?? 0;
+      if (c <= 0) return false;
+      cnt.set(x, c - 1);
+    }
+    return true;
   }
-  // upsize: fewest PSUs, then smallest primary/secondary/tertiary, that meets the load
-  const feasible = matrix
-    .filter(meets)
-    .sort(
-      (a, b) =>
-        (a.tertiary ? 1 : 0) - (b.tertiary ? 1 : 0) ||
-        w(a.primary) - w(b.primary) ||
-        w(a.secondary) - w(b.secondary) ||
-        w(a.tertiary) - w(b.tertiary),
-    );
-  if (feasible.length) {
-    const r = feasible[0];
-    return {
-      primary: r.primary,
-      secondary: r.secondary,
-      tertiary: r.tertiary ?? null,
-      watts: r.poe_budget_watts,
-      reason: "upsized primary (no secondary covered the load)",
-    };
-  }
-  return null; // load not satisfiable by this model's PSU options
 }
 
 // License tier is locked on DNA -E/-A models and selectable on Meraki -M
