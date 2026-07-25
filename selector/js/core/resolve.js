@@ -251,15 +251,24 @@ function resolvePower(model, query, kb) {
   // an unsourced blank into a confident "does not meet" — meets stays null.
   const matrixUnconfirmed = (model._incomplete ?? []).includes("poe_budget_matrix");
 
+  // The PSU bay layout, as one self-contained section: how many bays, the default
+  // shipped primary, and what each bay accepts. PoE-independent — this is the
+  // "redundant PSU" answer that stands on its own next to the PoE budget matrix.
+  const psu_bays = {
+    count: bays, // 0 = fixed / integrated supply
+    fixed: bays === 0,
+    populated_by_default: 1, // the kitlist ships exactly the default_primary
+    default_primary: ps.default_primary,
+    primary_options: ps.valid_primary ?? [], // what may be the PRIMARY (a role restriction)
+    additional_bay_options: bays >= 2 ? (group?.members ?? []) : [], // any group member fits a spare bay
+    max_additional: bays === 0 ? 0 : Math.max(bays - 1, 0),
+  };
+  if (bays >= 2 && group?.secondary_none_option != null)
+    psu_bays.decline_redundant_sku = group.secondary_none_option;
+
   const out = {
     group: ps.group,
-    bays,
-    populated_by_default: 1, // the kitlist ships exactly the default_primary
-    valid_primary: ps.valid_primary ?? [],
-    default_primary: ps.default_primary,
-    additional_bay_options: bays >= 2 ? (group?.members ?? []) : [],
-    max_additional: bays === 0 ? 0 : Math.max(bays - 1, 0),
-    secondary_none_option: group?.secondary_none_option,
+    psu_bays,
     default_config: chooseDefaultPsu(ps, kb, need, redundancy, triple, bays),
     poe_budget_matrix: rows,
     meets_requested_budget: need == null || matrixUnconfirmed ? null : rows.length > 0,

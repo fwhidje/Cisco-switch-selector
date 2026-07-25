@@ -312,7 +312,7 @@ export function kitList(bom, model) {
         [dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ") +
         (dc.watts != null ? ` → ${dc.watts}W PoE` : "");
       const matrix = bom.power.poe_budget_matrix ?? [];
-      const bays = bom.power.bays ?? 0;
+      const bays = bom.power.psu_bays?.count ?? 0;
       let alts;
       if (matrix.length) {
         // PoE model: alternatives are the other orderable (primary,secondary,…) arrangements.
@@ -403,7 +403,7 @@ export function buildCopyBOM(r) {
   }
   const dc = r.power?.default_config;
   if (dc) {
-    if (dc.primary && dc.primary !== r.power.default_primary) lines.push(dc.primary);
+    if (dc.primary && dc.primary !== r.power.psu_bays?.default_primary) lines.push(dc.primary);
     if (dc.secondary) lines.push(dc.secondary);
     if (dc.tertiary) lines.push(dc.tertiary);
   }
