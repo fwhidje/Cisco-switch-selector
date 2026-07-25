@@ -209,31 +209,49 @@ export function mount(root, ctx) {
       );
     }
 
-    // power
+    // power — two independent sections: the PSU bay layout / redundancy (always,
+    // PoE-independent), then the PoE budget matrix (only when the model is PoE).
     if (bom.power) {
       const dc = bom.power.default_config;
-      const matrix = bom.power.poe_budget_matrix ?? [];
-      const primaries = bom.power.valid_primary ?? [];
-      // Bays (a chassis fact) drive redundancy — NOT the matrix. bays >= 2: a spare
-      // bay accepts any group member; bays: 0: integrated supply, no redundancy.
-      const bays = bom.power.bays ?? 0;
-      const addOpts = bom.power.additional_bay_options ?? [];
-      const maxAdd = bom.power.max_additional ?? 0;
-      const baysNote = bays === 0 ? "integrated supply (no PSU bay)" : `${bays} PSU bays`;
+      const pb = bom.power.psu_bays ?? {};
+      const count = pb.count ?? 0;
+      const primaries = pb.primary_options ?? [];
+      const addOpts = pb.additional_bay_options ?? [];
+      const maxAdd = pb.max_additional ?? 0;
       const ships = dc
-        ? ` — ships as ${[dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ")} (${dc.reason})`
+        ? `ships as ${[dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ")}` +
+          `${dc.watts != null ? ` → ${dc.watts}W PoE` : ""} (${dc.reason})`
         : "";
+
+      // --- Redundant PSU: bays, default primary, and per-bay options ---
+      const headline = pb.fixed
+        ? "Fixed integrated PSU — no redundancy (no PSU bay)"
+        : `${count} PSU bays — N+${Math.max(count - 1, 0)} redundancy capable`;
+      const primaryOpts =
+        primaries.map((p) => (p === pb.default_primary ? `${p} (default)` : p)).join(", ") || "—";
+      const rows = [["primary", primaryOpts]];
+      if (count >= 2) {
+        const decline = pb.decline_redundant_sku ? ` · decline: ${pb.decline_redundant_sku}` : "";
+        rows.push([
+          `redundant (up to ${maxAdd} bay${maxAdd === 1 ? "" : "s"})`,
+          `${addOpts.join(" / ") || "—"}${decline}`,
+        ]);
+      }
+      out.appendChild(
+        section(
+          "Redundant PSU",
+          el("p", "lookup-note", ships ? `${headline} · ${ships}` : headline),
+          table(["bay", "options"], rows),
+        ),
+      );
+
+      // --- PoE budget matrix (unchanged): what each populated set delivers ---
+      const matrix = bom.power.poe_budget_matrix ?? [];
       if (matrix.length) {
-        // PoE model: each row is one orderable (primary[,secondary[,tertiary]]) arrangement.
         const prov = bom.power.poe_budget_matrix_unconfirmed
-          ? " · budget UNCONFIRMED (derived, not datasheet-sourced)"
+          ? " · budget UNCONFIRMED (derived by analogy, not datasheet-sourced)"
           : "";
-        const note = el(
-          "p",
-          "lookup-note",
-          `${baysNote} · valid primary: ${primaries.join(", ") || "—"} · default: ${bom.power.default_primary}${ships}${prov}`,
-        );
-        const rows = matrix.map((m) => [
+        const mrows = matrix.map((m) => [
           m.primary,
           m.secondary ?? "—",
           m.tertiary ?? "—",
@@ -241,47 +259,9 @@ export function mount(root, ctx) {
         ]);
         out.appendChild(
           section(
-            "PSU configurations (PoE budget)",
-            note,
-            table(["primary", "secondary", "tertiary", "PoE budget"], rows),
-          ),
-        );
-      } else if (bays >= 2) {
-        // Multi-bay, no PoE budget to tabulate: up to `maxAdd` more PSU(s) may be
-        // fitted for redundancy. Options are the group members (the compatibility list).
-        const note = el(
-          "p",
-          "lookup-note",
-          `${baysNote} · ships as a single ${bom.power.default_primary}; up to ${maxAdd} more PSU${maxAdd === 1 ? "" : "s"} may be added for redundancy${ships}`,
-        );
-        const primaryOpts =
-          primaries
-            .map((p) => (p === bom.power.default_primary ? `${p} (default)` : p))
-            .join(", ") || "—";
-        const addLabel = `none — single (default) · additional: ${addOpts.join(" / ") || "—"}`;
-        out.appendChild(
-          section(
-            "PSU options",
-            note,
-            table(
-              ["slot", "options"],
-              [
-                ["primary", primaryOpts],
-                [`additional (${maxAdd} bay${maxAdd === 1 ? "" : "s"})`, addLabel],
-              ],
-            ),
-          ),
-        );
-      } else {
-        // Integrated / fixed supply (bays: 0): no bay to add a PSU to.
-        out.appendChild(
-          section(
-            "PSU",
-            el(
-              "p",
-              "lookup-note",
-              `${bom.power.default_primary} — integrated supply (no PSU bay, no redundancy).`,
-            ),
+            "PoE budget (per PSU combination)",
+            el("p", "lookup-note", `default primary: ${pb.default_primary}${prov}`),
+            table(["primary", "secondary", "tertiary", "PoE budget"], mrows),
           ),
         );
       }
