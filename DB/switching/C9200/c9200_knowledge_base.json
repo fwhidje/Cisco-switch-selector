@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco Catalyst 9200 Series switches. Carries the catalog (atomic SKU facts), groups (named shared compatibility sets), and switch models for C9200 (modular uplink), C9200L (fixed uplink), C9200CX (compact, fanless, fixed uplink), C9200L-M (Meraki-managed, fixed uplink), and C9200CX-M (Meraki-managed, compact). C9200L-M model entries (14) and C9200CX-M model entries (7) are complete. Structure: catalog + groups + models.",
@@ -845,33 +845,39 @@
       {
         "id": "c9200-psus",
         "members": ["PWR-C6-125WAC", "PWR-C6-600WAC", "PWR-C6-1KWAC"],
+        "bays": 2,
         "secondary_none_option": "C9200-SPS-NONE",
         "notes": "Cisco Catalyst 9200 (modular uplink) Config-6 AC PSU family (OG Table 5). AC only (DC PWR-C6-715WDC intentionally omitted). Which member is a valid PRIMARY, the default shipped PSU, and the PoE budget per (primary,secondary) pair are switch-specific and live on the model entry (Pass 2)."
       },
       {
         "id": "c9200l-psus",
         "members": ["PWR-C5-125WAC", "PWR-C5-600WAC", "PWR-C5-1KWAC"],
+        "bays": 2,
         "secondary_none_option": "C9200L-SPS-NONE",
         "notes": "Cisco Catalyst 9200L (fixed uplink) Config-5 AC PSU family (OG Table 5). AC only (DC PWR-C5-715WDC intentionally omitted). Distinct SKUs from the C9200 Config-6 family (shallower chassis); kept as its own named group. Per-model valid_primary/default/PoE budget live on the model entry (Pass 2)."
       },
       {
         "id": "c9200cx-ac-internal-psus",
         "members": ["C9200CX-PSU-315WAC-INTERNAL"],
+        "bays": 0,
         "notes": "Fixed internal 315W AC supply on C9200CX-12P-2X2G / -8P-2X2G / -8UXG-2X. Single-member group: this chassis has no PSU bay, no field-replaceable unit, and no redundancy pair — the group exists only so the standard power_supplies shape applies."
       },
       {
         "id": "c9200cx-hvdc-internal-psus",
         "members": ["C9200CX-PSU-315WHVDC-INTERNAL"],
+        "bays": 0,
         "notes": "Fixed internal 315W dual-input HVDC/AC supply on C9200CX-12P-2XGH / -8P-2XGH / -8UXG-2XH. Single-member group, same rationale as c9200cx-ac-internal-psus."
       },
       {
         "id": "c9200cx-12t-power-adapters",
         "members": ["C9K-80W-ADPT", "C9K-ADPT-DC"],
+        "bays": 0,
         "notes": "C9200CX-12T-2X2G only. This model ships with NO internal power supply (OG: 'does not come with a power supply by default'); its true default powering is as a PD drawing 802.3bt Class 6 / UPOE from an upstream switch's uplink. These two SKUs are the optional external adapters (AC-DC and DC-DC, both 80W). default_primary proposes the AC-DC adapter so power is not overlooked at order time; running with no adapter at all (pure PD) is fully valid but is not offered as a selectable group member since every catalog power_supply requires watts>=1 — see the model's axis_value_provenance.power_source."
       },
       {
         "id": "c9200l-m-psus",
         "members": ["PWR-C5-125WAC-M", "PWR-C5-600WAC-M", "PWR-C5-1KWAC-M"],
+        "bays": 2,
         "secondary_none_option": "C9200L-SPS-NONE",
         "notes": "Cisco Catalyst 9200L-M (Meraki) series PSU set (Optional Accessories table, C9200L-M Datasheet). -M SKUs, same wattages as the base C9200L Config-5 family; reuses the existing C9200L-SPS-NONE none-option per the C9300L-M convention. Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the model entry (Part 2)."
       }

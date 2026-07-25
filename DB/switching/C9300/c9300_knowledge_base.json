@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco Catalyst 9300 family, spanning the C9300 (modular uplink), C9300LM, and C9300L (fixed uplink) sub-families. Structure: axis_registry (filterable vocabulary) + catalog (atomic SKU facts) + groups (named shared compatibility sets) + models (switch entries that supply axis values, reference groups, and on fixed-uplink models carry an inline uplink_capacity block in place of a module-group reference).",
@@ -1055,6 +1055,7 @@
           "PWR-C1-1900WHV-T",
           "PWR-C1-715WDC"
         ],
+        "bays": 2,
         "secondary_none_option": "C9300-SPS-NONE",
         "notes": "Membership from Hardware Installation Guide Table 1 (Power Supply Module Part Numbers), pruned to the Platinum (-P) variant wherever a non-Platinum twin exists at the same wattage (non-Platinum units are not proposed/quotable). Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the switch entry. C9300 (modular uplink) series. Excludes the -UP Platinum-upgrade migration SKUs (PWR-C1-715WAC-UP, PWR-C1-1100WAC-UP), which are not base configurables."
       },
@@ -1067,12 +1068,14 @@
           "PWR-C1-1900WAC-P",
           "PWR-C1-715WDC"
         ],
+        "bays": 2,
         "secondary_none_option": "C9300L-SPS-NONE",
         "notes": "Membership from Hardware Installation Guide Table 1 (Power Supply Module Part Numbers), pruned to the Platinum (-P) variant wherever a non-Platinum twin exists at the same wattage (non-Platinum units are not proposed/quotable). Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the switch entry. C9300L (fixed uplink) series. Shares the C1 PSU family with C9300/C9300X but the HIG lists a distinct membership; kept as its own named group so it can diverge."
       },
       {
         "id": "c9300lm-psus",
         "members": ["PWR-C6-1KWAC", "PWR-C6-600WAC", "PWR-C6-715WDC"],
+        "bays": 2,
         "secondary_none_option": "C9300L-SPS-NONE",
         "notes": "C9300LM-specific PSU set (HIG Table 1 lists C6-600WAC and C6-1KWAC; C6-715WDC retained per project decision for future DC filtering, and is referenced by the LM PoE matrix). C9300LM uses different power supplies than 9300/9300X/9300L. Which member is valid as primary, and the achievable PoE budget per (primary,secondary) pair, are switch-specific and live on the switch entry."
       },
@@ -1085,6 +1088,7 @@
           "PWR-C1-1900WAC-P",
           "PWR-C1-715WDC"
         ],
+        "bays": 2,
         "secondary_none_option": "C9300-SPS-NONE",
         "notes": "Membership from Hardware Installation Guide Table 1 (Power Supply Module Part Numbers), pruned to the Platinum (-P) variant wherever a non-Platinum twin exists at the same wattage (non-Platinum units are not proposed/quotable). Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the switch entry. C9300X (modular uplink) series. All members already Platinum/DC per HIG."
       },
@@ -1096,12 +1100,14 @@
           "PWR-C1-1100WAC-P-M",
           "PWR-C1-1900WAC-P-M"
         ],
+        "bays": 2,
         "secondary_none_option": "C9300-SPS-NONE",
         "notes": "C9300-M series PSU set (C9300-M Datasheet p. 8 accessories table). -M SKUs are cross-compatible with non-M equivalents per datasheet p. 9. PWR-C1-1900WAC-P-M restricted to C9300/C9300X (not C9300L) per accessories table. Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the model entry."
       },
       {
         "id": "c9300l-m-psus",
         "members": ["PWR-C1-350WAC-P-M", "PWR-C1-715WAC-P-M", "PWR-C1-1100WAC-P-M"],
+        "bays": 2,
         "secondary_none_option": "C9300L-SPS-NONE",
         "notes": "C9300L-M series PSU set. Excludes PWR-C1-1900WAC-P-M (not listed for C9300L in accessories table). -M SKUs cross-compatible with non-M equivalents per datasheet p. 9. Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the model entry."
       },
@@ -1113,6 +1119,7 @@
           "PWR-C1-1100WAC-P-M",
           "PWR-C1-1900WAC-P-M"
         ],
+        "bays": 2,
         "secondary_none_option": "C9300-SPS-NONE",
         "notes": "C9300X-M series PSU set (C9300-M Datasheet p. 8 accessories table). -M SKUs cross-compatible with non-M equivalents per datasheet p. 9. Which member is valid as PRIMARY and the PoE budget per (primary,secondary) pair are switch-specific and live on the model entry."
       }

@@ -1,7 +1,7 @@
 {
   "header": {
-    "schema_version": "2.0.0",
-    "registry_version": "2.0.0",
+    "schema_version": "3.0.0",
+    "registry_version": "3.0.0",
     "axes_file": "../switching-axes.json",
     "schema_file": "../switch-kb.schema.json",
     "description": "Networking Equipment Selector knowledge base for the Cisco C9550 Series Smart Switches. Pass 2 of 2: catalog, groups, and models are all populated. C9550 are fixed core/aggregation switches on Silicon One E100/E104: C9550-24L4CD and C9550-48L4CD (1RU), C9550-96L4D (2RU). No PoE, no network-module bay (fixed uplinks), StackWise Virtual on all models, unified Advantage-only licensing. Structure: catalog + groups + models.",
@@ -127,6 +127,7 @@
       {
         "id": "c9550-psus",
         "members": ["C9K-PWR-750WAC", "C9K-PWR-1100WAC"],
+        "bays": 2,
         "secondary_none_option": "C9550-SPS-NONE",
         "notes": "Complete orderable AC PSU family for C9550 (datasheet Table 8 / ordering guide Table 2). Per-model valid_primary picks the chassis-appropriate one: 750WAC for the 1RU models, 1100WAC for the 2RU model. No DC PSU exists. secondary_none_option is the CCW SKU to decline a redundant secondary."
       }

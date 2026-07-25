@@ -1,7 +1,7 @@
 {
   "$id": "switching-axes.json",
   "title": "Switching Decision-Variable Registry",
-  "registry_version": "2.0.0",
+  "registry_version": "3.0.0",
   "role": "Authoritative vocabulary for the Networking Equipment Selector. The registry enforces MEANING (what can be constrained, how, and which values are legal). It is the SOURCE; the KB schema is a projection of it. Nothing is constrainable unless declared here. v1.0.0 unifies the former axes + config_variables split into ONE flat list of DECISION VARIABLES over configurations: a solve answers with configurations (model + uplink option + PSU set + license SKUs + cables), and whether a variable filters models or refines the kitlist is declared per variable (`eliminates`), not a structural class. validate-kb.mjs checks model values and bindings against this file.",
   "consumers": [
     "Web UI builds form controls and panel layout from this registry (KIND drives the control; presentation drives WHERE it surfaces).",
@@ -238,13 +238,13 @@
       "dimension": "configuration",
       "binding": {
         "source": "power_supply_group",
-        "via": "configurables.power_supplies (group, valid_primary, poe_budget_matrix)"
+        "via": "configurables.power_supplies (group, valid_primary, poe_budget_matrix) + power_supply_group.bays"
       },
       "accepted_conditions": [],
       "eliminates": false,
       "default": { "kind": "policy", "policy": "psu-default" },
       "presentation": { "group": "Stacking / PSU", "ask_priority": 70 },
-      "notes": "The resolved PSU set (primary [, secondary [, tertiary]]). NOT directly constrainable (accepted_conditions is empty) — it is steered indirectly through poe_budget_watts, psu_redundancy, and psu_triple, and resolved by the named 'psu-default' policy (code, with every choice carrying a reason in the response): ship the model's default_primary; ADD a secondary to meet a higher PoE load; upsize the primary only when no secondary covers it; redundancy forces a matched pair; triple forces a tertiary-capable row. Declared here so the PSU choice is an honest, visible part of the residual decision space (its domain = the model's valid_primary + poe_budget_matrix rows)."
+      "notes": "The resolved PSU set (primary [, secondary [, tertiary]]). NOT directly constrainable (accepted_conditions is empty) — it is steered indirectly through poe_budget_watts, psu_redundancy, and psu_triple, and resolved by the named 'psu-default' policy (code, with every choice carrying a reason in the response): ship the model's default_primary; ADD a secondary to meet a higher PoE load; upsize the primary only when no secondary covers it; redundancy populates a second bay; triple populates a third. How many PSUs fit is the group's `bays` count (a chassis fact); what a set delivers is the poe_budget_matrix (a datasheet fact) — extra PSUs beyond what the matrix budget needs add redundancy, not sourced watts. Declared here so the PSU choice is an honest, visible part of the residual decision space (its domain = the group's members over its `bays`)."
     },
     {
       "name": "psu_redundancy",
@@ -256,7 +256,7 @@
       "eliminates": false,
       "default": { "kind": "fixed", "value": false },
       "presentation": { "group": "Stacking / PSU", "ask_priority": 45 },
-      "notes": "Off by default: the kitlist ships a single PSU (configurables.power_supplies.default_primary), and a secondary is added only when a PoE request exceeds what the default primary alone delivers. When ON, the configurator forces a redundant (primary, secondary) pair. Never eliminates a model."
+      "notes": "Off by default: the kitlist ships a single PSU (configurables.power_supplies.default_primary), and a secondary is added only when a PoE request exceeds what the default primary alone delivers. When ON, populates a second bay as a redundant (primary, secondary) pair — legal on a chassis whose power_supply_group.bays >= 2; on a bays: 0 integrated-supply chassis it has no effect (redundancy is unavailable) and the model is never eliminated. Never eliminates a model."
     },
     {
       "name": "psu_triple",
@@ -272,7 +272,7 @@
         "ask_priority": 46,
         "depends_on": { "variable": "psu_redundancy", "value": true }
       },
-      "notes": "Off by default. When ON, forces a triple-PSU (primary+secondary+tertiary) configuration on models whose poe_budget_matrix has a tertiary-capable row; has no effect on models without one (e.g. two-bay chassis). Never eliminates a model."
+      "notes": "Off by default. When ON, populates the third PSU bay — legal on a chassis whose power_supply_group.bays >= 3 (today only the C9350). On a chassis with fewer bays it clamps to what fits, with a reason, and never eliminates the model. A third PSU adds redundancy / StackPower headroom; it raises the reported PoE budget only where the datasheet publishes a higher three-PSU row (poe_budget_matrix tertiary), otherwise the sourced 2-PSU budget stands. Never eliminates a model."
     },
     {
       "name": "license_regime",

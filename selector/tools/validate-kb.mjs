@@ -519,6 +519,35 @@ function checkBindings(kb, kbFail) {
         `${m.id}.configurables.power_supplies`,
         "the psu-default policy requires default_primary",
       );
+    // No matrix row may populate more PSUs than the chassis holds. An integrated
+    // supply (bays: 0) still holds its one fixed PSU, so the cap is max(bays, 1).
+    if (cfg.power_supplies) {
+      const ps = cfg.power_supplies;
+      const bays = ps.bays ?? idx.power_supply_groups.get(ps.group)?.bays ?? 0;
+      const cap = bays === 0 ? 1 : bays;
+      for (const r of ps.poe_budget_matrix ?? []) {
+        const n = 1 + (r.secondary != null ? 1 : 0) + (r.tertiary != null ? 1 : 0);
+        if (n > cap)
+          kbFail(
+            `${m.id}.poe_budget_matrix`,
+            `a row populates ${n} PSUs but the chassis holds at most ${cap} (bays: ${bays})`,
+          );
+      }
+    }
+  }
+  // Group invariant: a secondary_none_option (a bay to decline) exists iff bays >= 2.
+  for (const g of kb.groups?.power_supply_groups ?? []) {
+    const hasNone = g.secondary_none_option != null;
+    if (g.bays === 0 && hasNone)
+      kbFail(
+        `power_supply_group ${g.id}`,
+        "bays: 0 (integrated supply) must not declare a secondary_none_option",
+      );
+    if (g.bays >= 2 && !hasNone)
+      kbFail(
+        `power_supply_group ${g.id}`,
+        `bays: ${g.bays} needs a secondary_none_option (a secondary bay to decline)`,
+      );
   }
 }
 
@@ -546,6 +575,21 @@ function checkDerived(kb, kbFail, kbWarn) {
       }
     } else if (matrix.length > 0) {
       kbFail(`${m.id}.poe_budget_matrix`, "non-PoE model must have an empty PoE matrix");
+    }
+    // Permutation consistency: a PSU population has exactly ONE budget, so the same
+    // primary + the same multiset of other-bay PSUs must give the same watts. Catches
+    // the 48HXN class where 850+850+1600 and 850+1600+850 disagreed (3670 vs 3220).
+    const seen = new Map();
+    for (const r of matrix) {
+      const others = [r.secondary, r.tertiary].filter((x) => x != null).sort();
+      const key = `${r.primary} + ${others.join(" + ") || "(single)"}`;
+      const prev = seen.get(key);
+      if (prev != null && prev !== r.poe_budget_watts)
+        kbFail(
+          `${m.id}.poe_budget_matrix`,
+          `PSU set [${key}] has conflicting budgets ${prev}W vs ${r.poe_budget_watts}W`,
+        );
+      else seen.set(key, r.poe_budget_watts);
     }
   }
 }

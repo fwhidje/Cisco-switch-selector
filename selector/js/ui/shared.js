@@ -312,16 +312,20 @@ export function kitList(bom, model) {
         [dc.primary, dc.secondary, dc.tertiary].filter(Boolean).join(" + ") +
         (dc.watts != null ? ` → ${dc.watts}W PoE` : "");
       const matrix = bom.power.poe_budget_matrix ?? [];
+      const bays = bom.power.bays ?? 0;
       let alts;
       if (matrix.length) {
         // PoE model: alternatives are the other orderable (primary,secondary,…) arrangements.
         const chosen = psuComboText({ ...dc, poe_budget_watts: dc.watts });
         alts = matrix.map(psuComboText).filter((t) => t !== chosen);
-      } else if (bom.power.secondary_none_option != null && !dc.secondary) {
-        // Non-PoE dual-bay: no matrix, but a matched second PSU is available for redundancy.
+      } else if (bays >= 2 && !dc.secondary) {
+        // Multi-bay, no matrix: a matched second PSU is available for redundancy.
         alts = ["+ matched redundant PSU (optional)"];
       }
-      kit.appendChild(kitLine("power", label, dc.reason, alts));
+      // watts_basis explains a budget carried over from a sourced subset (extra PSUs
+      // add redundancy, not sourced watts) — surface it next to the reason.
+      const reason = dc.watts_basis ? `${dc.reason} — ${dc.watts_basis}` : dc.reason;
+      kit.appendChild(kitLine("power", label, reason, alts));
     }
   }
 

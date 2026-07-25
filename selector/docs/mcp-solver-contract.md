@@ -3,7 +3,7 @@
 > **Status: normative.** This document fixes the boundary between the solver core
 > (`selector/js/core/`) and the Stage-2 MCP server (`mcp/`). The server is a *renderer* of the
 > core's query/response contract — the same standing every other front-end has (guideline §4).
-> Registry baseline: **registry v1.0.0** (`DB/switching/switching-axes.json`).
+> Registry baseline: **registry v3.0.0** (`DB/switching/switching-axes.json`).
 
 ## 1. What the core guarantees to the server
 
