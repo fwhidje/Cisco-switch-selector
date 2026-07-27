@@ -8,16 +8,30 @@ is the normative boundary document.** Runs as a stateless Cloudflare Worker
 
 ## Tools
 
-- **`lookup_model`** `{model}` — exact-model option summary (uplink modules, PSU/PoE matrix,
-  license groups & terms, cables) as a resolved default BOM. Unknown ids error with the
-  nearest known ids.
-- **`find_configurations`** `{requirements?, poe_demand?, port_demand?, limit?}` — solve
-  requirements into complete orderable configurations. The input schema is **generated from
-  the registry** (`switching-axes.json`): every variable, legal value, and condition is
-  visible in the tool definition. `open_variables` in the response is the agent's
-  "what to ask next" list; `must_resolve` entries (license regime/tier/term) have no safe
-  default and must be settled before a BOM is final. There is deliberately no guided tool —
-  dialogue is the client agent's job over `open_variables`.
+Two tools, split on the axis a caller routes on: **do you have a model id, or requirements?**
+
+- **`lookup_model`** `{model}` — the configurable option space for one exact SKU (uplink
+  modules, PSU/PoE matrix, license groups & terms, cables) as a resolved default kitlist.
+  Cheap and repeatable — call it per line when walking a kitlist. Unknown ids error with
+  the nearest known ids.
+- **`find_switch_kitlists`** `{requirements?, poe_demand?, port_demand?, limit?}` — solve
+  requirements into complete orderable kitlists. The input schema is **generated from the
+  registry** (`switching-axes.json`): every variable, legal value, condition and
+  agent-facing note is visible in the tool definition.
+
+Both are **one-shot**: the caller states the whole ask and gets kitlists back. There is
+deliberately no guided tool and the descriptions must not teach an ask-then-re-call loop —
+the selector is stateless and never asks questions.
+
+Each kitlist marks what it decided (`bom.decisions`, contract §2.1): `pinned` / `defaulted`
+/ `forced` / `required`. `defaulted` is the "what should I discuss with the customer?" set;
+`required` means the order is incomplete until the caller settles it — licensing, normally,
+because a switch ships with no license and needs one. A `required` block returns
+`chosen: null` plus its full option space and is **never** given a manufactured default.
+
+**Tool descriptions are load-bearing** — they are the entire interface a calling agent sees.
+Each carries, in order: domain anchor, scope (the loaded families), trigger, and a
+cross-reference to its sibling. Treat edits to them as interface changes, not copy edits.
 
 ## Run locally
 

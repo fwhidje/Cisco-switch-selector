@@ -1,16 +1,23 @@
 // index.js — the Stage-2 MCP server: a stateless Worker over the unchanged
 // solver core (selector/docs/mcp-solver-contract.md is normative).
 //
-// Exactly two tools. No guided/dialogue surface: the selector is stateless and
-// never asks questions — open_variables in every find_configurations response
-// is the client agent's follow-up-question list. Queries are built ONLY via
-// core/query.js; this file contains no selection logic.
+// Exactly two tools, split on the axis a caller actually routes on: do you have
+// a model id (lookup_model) or requirements (find_switch_kitlists)? Both are
+// ONE-SHOT — the caller states the whole ask and gets kitlists back, each one
+// marking what it decided and what still needs a choice (bom.decisions). There
+// is deliberately no guided/dialogue surface: the selector is stateless and
+// never asks questions, and the tools must not teach an ask-then-re-call loop.
+//
+// Queries are built ONLY via core/query.js; this file contains no selection
+// logic. Tool DESCRIPTIONS are load-bearing — they are the entire interface a
+// calling agent sees, so each one carries, in order: domain anchor, scope,
+// trigger, and a cross-reference to its sibling.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler } from "agents/mcp";
 
 import { registry, kb } from "./data.js";
-import { findConfigurationsShape, lookupModelShape } from "./schema.js";
+import { findKitlistsShape, lookupModelShape } from "./schema.js";
 import { trimResponse, nearestModels } from "./respond.js";
 import { solve } from "../../selector/js/core/solver.js";
 import {
@@ -23,6 +30,11 @@ import {
 const json = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj, null, 1) }] });
 const fail = (obj) => ({ ...json(obj), isError: true });
 
+// Both tools read a KB snapshot bundled at build time: no writes, same answer for
+// the same arguments, and a closed world (the loaded families are the whole
+// catalogue). Hosts use these to decide what may run without a prompt.
+const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
+
 function createServer() {
   const server = new McpServer({
     name: "switch-selector",
@@ -32,9 +44,10 @@ function createServer() {
   server.registerTool(
     "lookup_model",
     {
-      title: "Look up one switch model",
+      title: "Look up one Cisco switch model",
       description:
-        "Exact-model lookup: returns the model's full option summary — uplink modules with port capabilities, PSU configurations with the PoE-budget matrix, license groups and terms, cables — as a resolved default BOM plus per-candidate choice domains (the datasheet summary without the datasheet). Unknown ids return an error listing the closest known ids.",
+        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): the configurable option space for one exact switch SKU — uplink modules with port capabilities, PSU bays with the PoE-budget matrix, license groups and terms, cables — as a resolved default kitlist plus the full choice domain behind each decision. Use it when you already have a model id (a kitlist line, a quote, a customer's existing estate); it is cheap and repeatable, so call it once per SKU when walking a list. If you have requirements rather than a model id, use find_switch_kitlists instead. Unknown ids return an error listing the closest known ids.",
+      annotations: READ_ONLY,
       inputSchema: lookupModelShape(),
     },
     async ({ model }) => {
@@ -43,7 +56,7 @@ function createServer() {
         return fail({
           error: `unknown model id '${model}'`,
           nearest_known_ids: nearestModels(kb.models, model),
-          hint: "retry lookup_model with one of nearest_known_ids, or use find_configurations to search by requirements",
+          hint: "retry lookup_model with one of nearest_known_ids, or use find_switch_kitlists to search by requirements",
         });
       return json(
         trimResponse(res, [{ variable: "model_id", condition: "==", value: model }], registry, 1),
@@ -52,12 +65,13 @@ function createServer() {
   );
 
   server.registerTool(
-    "find_configurations",
+    "find_switch_kitlists",
     {
-      title: "Find switch configurations from requirements",
+      title: "Find Cisco switch kitlists from requirements",
       description:
-        "Solve customer requirements into complete, orderable switch configurations (model + fitted uplink option + PSUs + license SKUs + cables), each default choice carrying its reason. The response also returns open_variables — every decision the query left open, with its remaining domain and default; entries flagged must_resolve (license regime/tier/term) have NO safe default and must be settled with the user before a bill of materials is final: ask, then re-call with the answer added to requirements. State demands as the customer gives them (counts and levels); never pre-compute watts.",
-      inputSchema: findConfigurationsShape(registry),
+        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): turn a customer requirement set — port counts and speeds, PoE demand, PSU redundancy, stacking, management and licensing — into complete orderable kitlists (switch + fitted uplink module + PSUs + license SKUs + cables). State the whole ask in ONE call: anything you leave out is treated as 'don't care', not as a question to come back for. Returns matching kitlists in no preference order, capped at 'limit' with total_candidates reporting the full count — so a large total means the ask was underspecified, not that these few are the best. Every kitlist marks what it decided: 'defaulted' choices have real alternatives worth raising with the customer, and a 'required' decision is left deliberately blank with its options because the order is incomplete without it (licensing, normally — a switch ships with no license and needs one). Give demands as the customer states them (counts and levels); never pre-compute watts. At least one of requirements, poe_demand or port_demand must be supplied. If you already know the exact model id, use lookup_model instead.",
+      annotations: READ_ONLY,
+      inputSchema: findKitlistsShape(registry),
     },
     async ({ requirements, poe_demand, port_demand, limit }) => {
       const query = [];

@@ -23,7 +23,10 @@
    datasheet math.
 4. **Registry as the single vocabulary.** The server's tool input schemas are *generated* from
    the registry via `registry.js` accessors (`getVariables`, `legalValues`,
-   `acceptedConditions`, `defaultRule`, `mustResolve`, `dependsOn`, `portModel`). Nothing is
+   `acceptedConditions`, `defaultRule`, `mustResolve`, `agentNote`, `dependsOn`,
+   `portModel`). Per-variable descriptions COMPOSE `agent_note` with the mechanical hints
+   for the variable's kind — they are never hand-written per variable in `schema.js`, and
+   never mutually exclusive. Nothing is
    constrainable through MCP that the registry does not declare; an undeclared variable
    appearing in a tool call is a `validateQuery()` problem, never a silent filter.
 
@@ -33,9 +36,35 @@
   text names the legal values/conditions, which is what lets an agent self-correct.
 - Treat `candidates[].bom` blocks as the per-candidate choice domains (they double as the
   option tables); never re-derive domains from the KB directly.
+- Pass each block's `decision` envelope (§2.1) through untouched. The server never
+  computes or re-labels a status — deciding what was decided is core work.
 - Return `open_variables` intact (§5) — it is the client agent's "what to ask next" list and
   the reason the server has no guided/dialogue surface: the selector is stateless and never
   asks questions; dialogue is the caller's job.
+
+### 2.1 Decision status on every BOM block
+
+`resolveBOM` marks each configurable block with a `decision` envelope
+(`{status, chosen, options_count, variables}`), and rolls them up into `bom.decisions`
+(`{counts, discuss, blocking}`). This is core work, not presentation: the solver is what
+knows whether a value was pinned, defaulted, forced, or left deliberately open, and both
+renderers (web UI and MCP server) consume the same marking.
+
+| status | meaning |
+|---|---|
+| `pinned` | the caller constrained it — the customer has already decided |
+| `defaulted` | resolved here, and real alternatives exist (the "what should I discuss with the customer?" set) |
+| `forced` | only one option; nothing to decide |
+| `required` | nothing chosen and nothing MAY be chosen — the kitlist is not orderable until the caller settles it |
+
+`required` is a **product** fact, not a solver one, and the distinction is load-bearing:
+an empty second PSU bay is a complete, working, orderable switch (`defaulted`), whereas a
+switch ships with **no** license and needs one to run (`required`). A `required` block
+must come back with `chosen: null` and its full option space — never manufacture a
+default to fill it, and never let a caller read a blank as "nothing needed here".
+
+The envelope is **additive**: no pre-existing block field is renamed or removed, so every
+existing renderer keeps working unchanged.
 
 ## 3. The IO seam: `mergeKBs`
 
@@ -60,12 +89,13 @@ Input: `{ model: string }`.
 Implementation: `solve([constraint("model_id", "==", model)], kb, registry)`.
 
 - Exact hit → the single candidate; its `bom` blocks are the option summary (uplink modules,
-  PSU/PoE matrix, license groups & terms, cables, included-by-default).
+  PSU/PoE matrix, license groups & terms, cables, included-by-default), each carrying its
+  `decision` envelope (§2.1).
 - No hit → a tool **error** whose message lists the nearest known model ids
   (case-insensitive substring/prefix match over the pool), so a mistyped SKU comes back with
   its own correction.
 
-### `find_configurations`
+### `find_switch_kitlists`
 
 Input (all fields optional, at least one required):
 

@@ -207,7 +207,7 @@ export function poolFeasible(pool, demands) {
 
 // --- BOM (kitlist) ----------------------------------------------------------
 export function resolveBOM(model, query, kb, validOptions) {
-  return {
+  const bom = {
     switch: { id: model.id, description: model.description },
     uplinks: resolveUplinkBOM(model, validOptions),
     power: resolvePower(model, query, kb),
@@ -215,6 +215,138 @@ export function resolveBOM(model, query, kb, validOptions) {
     accessories: resolveAccessories(model, query, kb),
     included_by_default: stripComment(model.included_by_default_non_selectable),
   };
+  markDecisions(bom, query);
+  return bom;
+}
+
+// --- Decision status --------------------------------------------------------
+// Every configurable block carries a `decision` envelope so a caller can tell —
+// without knowing each block's individual shape — what is settled and what still
+// needs a choice. Four statuses:
+//
+//   pinned    the caller constrained it; the customer has already decided
+//   defaulted resolved here, and REAL ALTERNATIVES EXIST — this is the
+//             "what should I discuss with the customer?" set
+//   forced    only one option; there is nothing to decide
+//   required  nothing chosen, and nothing MAY be chosen here — the kitlist is
+//             not orderable until the caller settles it
+//
+// `required` is a PRODUCT fact, not a solver one, and the distinction is easy to
+// get wrong: an empty second PSU bay is a complete, working, orderable switch
+// (→ defaulted, chosen = the single shipped PSU), whereas a switch ships with NO
+// license and needs one to run (→ required). Never manufacture a default to fill
+// a `required` block — a null `chosen` is the answer there, not a gap.
+//
+// `variables` names the registry variables that settle the block, so a caller can
+// map an open decision straight back into the query it needs to re-send.
+//
+// Additive by design: no existing block field is renamed or removed, so the web
+// UI and every other renderer of this response keep working unchanged.
+const STATUSES = ["pinned", "defaulted", "forced", "required"];
+
+const decision = (variables, status, chosen, options_count) => ({
+  status,
+  chosen,
+  options_count,
+  variables,
+});
+
+function markDecisions(bom, query) {
+  const asked = (name) => pickValue(query, name) != null;
+
+  if (bom.uplinks) {
+    const n = bom.uplinks.options.length;
+    bom.uplinks.decision = decision(
+      ["uplink_module"],
+      asked("uplink_module") ? "pinned" : n <= 1 ? "forced" : "defaulted",
+      bom.uplinks.default,
+      n,
+    );
+  }
+
+  if (bom.power) {
+    const dc = bom.power.default_config;
+    // bays === 0 is an integrated supply: one PSU, no bay, nothing to choose.
+    const fixed = (bom.power.psu_bays?.count ?? 0) === 0;
+    bom.power.decision = decision(
+      ["psu_redundancy", "psu_triple", "poe_budget_watts"],
+      fixed ? "forced" : asked("psu_redundancy") || asked("psu_triple") ? "pinned" : "defaulted",
+      dc ? [dc.primary, dc.secondary, dc.tertiary].filter((x) => x != null) : null,
+      (bom.power.poe_budget_matrix ?? []).length,
+    );
+  }
+
+  if (bom.license) bom.license.decision = licenseDecision(bom.license, asked);
+
+  for (const [key, variable] of [
+    ["stack_cables", "stack_cable"],
+    ["stackpower_cables", "stackpower_cable"],
+  ]) {
+    const block = bom.accessories?.[key];
+    if (!block) continue;
+    const n = (block.members ?? []).length;
+    // members.length === 1 is still a choice: that cable, or the none_option.
+    block.decision = decision(
+      [variable],
+      asked(variable) ? "pinned" : n === 0 ? "forced" : "defaulted",
+      block.default,
+      n,
+    );
+  }
+
+  bom.decisions = summariseDecisions(bom);
+}
+
+// A license line is orderable only once regime, tier and term all resolve to one
+// concrete SKU. Anything short of that is `required`: the switch needs a license
+// and comes with none, so a blank here is an INCOMPLETE ORDER, not a default.
+function licenseDecision(lic, asked) {
+  const groups = lic.groups ?? [];
+  const only = groups.length === 1 ? groups[0] : null;
+  // A group with no term choices (e.g. Meraki subscription-L, one device-tied
+  // SKU) is term-settled without the caller saying anything.
+  const termSettled =
+    only != null && ((only.term_choices_years ?? []).length === 0 || only.chosen_term != null);
+  const variables = ["license_regime", "license_tier", "license_term"];
+
+  if (!only || !termSettled) return decision(variables, "required", null, groups.length);
+
+  const constrained = asked("license_regime") || asked("license_tier") || asked("license_term");
+  return decision(
+    variables,
+    constrained ? "pinned" : "forced",
+    {
+      group: only.id,
+      regime: only.regime,
+      tier: only.tier,
+      subscription_sku:
+        only.chosen_term?.subscription_sku ?? (only.subscription_members ?? [])[0] ?? null,
+    },
+    groups.length,
+  );
+}
+
+/** Roll the per-block decisions up so a caller sees the shape of the answer
+ *  without scanning every block: what is worth discussing, and what blocks the
+ *  order outright. */
+function summariseDecisions(bom) {
+  const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
+  const discuss = [];
+  const blocking = [];
+  const entries = [
+    ["uplinks", bom.uplinks?.decision],
+    ["power", bom.power?.decision],
+    ["license", bom.license?.decision],
+    ["accessories.stack_cables", bom.accessories?.stack_cables?.decision],
+    ["accessories.stackpower_cables", bom.accessories?.stackpower_cables?.decision],
+  ];
+  for (const [path, d] of entries) {
+    if (!d) continue;
+    counts[d.status] += 1;
+    if (d.status === "defaulted") discuss.push(path);
+    if (d.status === "required") blocking.push(path);
+  }
+  return { counts, discuss, blocking };
 }
 
 function resolveUplinkBOM(model, validOptions) {

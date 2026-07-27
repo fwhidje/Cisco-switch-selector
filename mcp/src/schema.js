@@ -14,6 +14,7 @@ import {
   acceptedConditions,
   isCountAtLevel,
   mustResolve,
+  agentNote,
   portModel,
 } from "../../selector/js/core/registry.js";
 
@@ -29,26 +30,33 @@ function valueType(v) {
   return z.string(); // open enum (model_id, KB-derived domains like uplink_module)
 }
 
-/** One branch of the requirements union: { variable, condition, value }. */
+/** One branch of the requirements union: { variable, condition, value }.
+ *
+ *  The description COMPOSES rather than falling back: the registry's agent_note
+ *  (written for the calling agent — when to constrain this, what it eliminates,
+ *  what a wrong guess costs) plus the mechanical hints derived from the variable's
+ *  kind. The previous `a || b || c` chain made these mutually exclusive, so an
+ *  ordered or no-default variable lost its explanation entirely and the rest were
+ *  truncated mid-word at 160 chars. `notes` stays untouched: it is written for
+ *  maintainers (storage, validator remarks), which is a different audience. */
 function requirementBranch(v) {
   const conds = acceptedConditions(v);
   const scalar = valueType(v);
   const value = conds.includes("in") ? z.union([scalar, z.array(scalar)]) : scalar;
-  const notes = [
+  const parts = [
+    agentNote(v),
     v.kind === "ordered"
-      ? `ordered ${JSON.stringify(v.order ?? legalValues(v))}; ">=" means this level or better`
+      ? `Ordered ${JSON.stringify(v.order ?? legalValues(v))} — ">=" means this level or better.`
       : null,
-    mustResolve(v) ? "must_resolve: no safe default — settle it before the BOM is orderable" : null,
-  ]
-    .filter(Boolean)
-    .join(". ");
+    mustResolve(v) ? "No default — the kitlist is not orderable until this is chosen." : null,
+  ].filter(Boolean);
   return z
     .object({
       variable: z.literal(v.name),
       condition: conds.length === 1 ? z.literal(conds[0]) : z.enum(conds),
       value,
     })
-    .describe(notes || (v.notes ? String(v.notes).slice(0, 160) : v.name));
+    .describe(parts.join(" ") || v.name);
 }
 
 /** The variables an agent can constrain directly: accepted conditions declared,
@@ -59,8 +67,8 @@ export function constrainableVariables(registry) {
   );
 }
 
-/** Raw shape for the find_configurations tool input. */
-export function findConfigurationsShape(registry) {
+/** Raw shape for the find_switch_kitlists tool input. */
+export function findKitlistsShape(registry) {
   const branches = constrainableVariables(registry).map(requirementBranch);
   const pm = portModel(registry)?.selector_enums ?? {};
   const speeds = pm.port_speed?.order ?? [];
