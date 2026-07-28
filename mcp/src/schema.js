@@ -112,7 +112,7 @@ export function findKitlistsShape(registry) {
       .max(20)
       .optional()
       .describe(
-        "Max candidates returned (default 5); total_candidates always reports the full survivor count.",
+        "How many kitlists come back in FULL detail (default 3, and 3 is usually right — each one is dense). Raising this is rarely what you want: all_matches already lists the SKU of every model that fits, and total_candidates reports the full survivor count.",
       ),
   };
 }
