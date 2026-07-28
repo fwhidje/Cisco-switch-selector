@@ -63,6 +63,11 @@ export const defaultRule = (v) => v?.default ?? null;
 /** True when no safe silent default exists — a caller must settle this variable. */
 export const mustResolve = (v) => v?.default?.kind === "must_resolve";
 
+/** Agent-facing description: when to constrain this variable, what it eliminates,
+ *  what a wrong guess costs. Distinct from `notes`, which is written for
+ *  maintainers (storage, validator remarks). Consumed by the MCP tool schema. */
+export const agentNote = (v) => v?.agent_note ?? null;
+
 /** A configuration variable's KB binding ({source, via}) or null. */
 export const binding = (v) => v?.binding ?? null;
 
