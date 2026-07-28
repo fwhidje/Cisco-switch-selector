@@ -33,6 +33,14 @@ because a switch ships with no license and needs one. A `required` block returns
 alongside **`all_matches`**, the uncapped id of every model that fits, in the same
 (smallest-sufficient-first) order. The cap hides detail, never existence, so raising
 `limit` is rarely the right move: read `all_matches`, then `lookup_model` a specific SKU.
+`all_matches` is absent from `lookup_model`, where "every model matching `model_id == X`"
+would just be `[X]`.
+
+**`open_variables` is the open decision space**, not an inventory of every registry
+variable: entries whose domain has collapsed to a single value are settled facts the
+candidates' BOM blocks already carry, and are filtered out. `must_resolve` entries always
+survive regardless of domain size — with one legal value the caller must still settle it,
+and hiding that would conceal the only thing blocking an orderable kitlist.
 
 **`constraint_cost`** reports, per constraint, how many extra models would survive without
 it (leave-one-out, contract §2.2) — so the top row is what is actually costing you, and a

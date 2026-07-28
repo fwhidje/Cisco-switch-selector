@@ -59,7 +59,10 @@ function createServer() {
           hint: "retry lookup_model with one of nearest_known_ids, or use find_switch_kitlists to search by requirements",
         });
       return json(
-        trimResponse(res, [{ variable: "model_id", condition: "==", value: model }], registry, 1),
+        trimResponse(res, [{ variable: "model_id", condition: "==", value: model }], registry, {
+          limit: 1,
+          allMatches: false,
+        }),
       );
     },
   );
@@ -69,7 +72,7 @@ function createServer() {
     {
       title: "Find Cisco switch kitlists from requirements",
       description:
-        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): turn a customer requirement set — port counts and speeds, PoE demand, PSU redundancy, stacking, management and licensing — into complete orderable kitlists (switch + fitted uplink module + PSUs + license SKUs + cables). State the whole ask in ONE call: anything you leave out is treated as 'don't care', not as a question to come back for. Returns the top 'limit' kitlists in full detail (default 3, and 3 is usually right — each is dense), ordered smallest-sufficient-configuration first, plus all_matches: the SKU of every model that fits. Raise 'limit' only when you genuinely need more kitlists in full; to see what else exists read all_matches, and call lookup_model on any single SKU worth a closer look. Every kitlist marks what it decided: 'defaulted' choices have real alternatives worth raising with the customer, and a 'required' decision is left deliberately blank with its options because the order is incomplete without it (licensing, normally — a switch ships with no license and needs one). If the result is thinner than expected, read constraint_cost: it reports, per constraint, how many extra models would survive if you dropped that one — so the row at the top is what is actually costing you, and a zero means every survivor already satisfies it. Those numbers overlap and must not be added together. Give demands as the customer states them (counts and levels); never pre-compute watts. At least one of requirements, poe_demand or port_demand must be supplied. If you already know the exact model id, use lookup_model instead.",
+        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): turn a customer requirement set — port counts and speeds, PoE demand, PSU redundancy, stacking, management and licensing — into complete orderable kitlists (switch + fitted uplink module + PSUs + license SKUs + cables). State the whole ask in ONE call: anything you leave out is treated as 'don't care', not as a question to come back for. Returns the top 'limit' kitlists in full detail (default 3, and 3 is usually right — each is dense), ordered smallest-sufficient-configuration first, plus all_matches: the SKU of every model that fits. Raise 'limit' only when you genuinely need more kitlists in full; to see what else exists read all_matches, and call lookup_model on any single SKU worth a closer look. Every kitlist marks what it decided: 'defaulted' choices have real alternatives worth raising with the customer, and a 'required' decision is left deliberately blank with its options because the order is incomplete without it (licensing, normally — a switch ships with no license and needs one). open_variables is the OPEN DECISION SPACE across the matches — only what is genuinely still in play, so anything narrowed to a single value is omitted as settled rather than listed. If the result is thinner than expected, read constraint_cost: it reports, per constraint, how many extra models would survive if you dropped that one — so the row at the top is what is actually costing you, and a zero means every survivor already satisfies it. Those numbers overlap and must not be added together. Give demands as the customer states them (counts and levels); never pre-compute watts. At least one of requirements, poe_demand or port_demand must be supplied. If you already know the exact model id, use lookup_model instead.",
       annotations: READ_ONLY,
       inputSchema: findKitlistsShape(registry),
     },
@@ -91,7 +94,10 @@ function createServer() {
 
       const res = solve(query, kb, registry);
       return json(
-        trimResponse(res, query, registry, limit ?? 3, constraintCost(query, kb, registry, res)),
+        trimResponse(res, query, registry, {
+          limit: limit ?? 3,
+          constraintCost: constraintCost(query, kb, registry, res),
+        }),
       );
     },
   );

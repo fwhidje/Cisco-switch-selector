@@ -138,15 +138,28 @@ deliberate addition.
 - `all_matches`: every survivor's model id, **uncapped**, taken from the untrimmed candidate
   list. This is what makes a small `limit` safe — the cap hides detail, never existence.
   Same order as `candidates`, so the first `limit` ids are the kitlists shown in full.
+  Omitted for `lookup_model`: "every model matching `model_id == X`" is `[X]`.
 - `constraint_cost`: from `constraintCost()` (§2.2). Computed by the core and passed into
   `trimResponse` — the server has no `kb` and must not acquire one. Omitted for
   `lookup_model`, where leave-one-out over a single `model_id ==` says nothing useful.
+
+The two tools therefore ship **different shapes**, and that is deliberate: the differences
+are named options on `trimResponse` (`{limit, constraintCost, allMatches}`) rather than
+inferred from `limit`, so each call site declares what its tool returns. Shape is stable
+*per tool*, which is what a caller actually depends on.
 - `eliminated`: **not shipped.** The former `eliminated_summary` (`{reason → count}`) was
   removed: it counted each model against the FIRST constraint it failed, making the numbers
   evaluation-order artifacts rather than costs. `constraint_cost` replaces it.
-- `open_variables`: **whole and untrimmed**, including each variable's remaining domain,
-  default, `must_resolve` flag, and the registry's `ask_priority` / `depends_on` presentation
-  hints (so a sequential agent asks in the intended order).
+- `open_variables`: the **open decision space** — every variable still genuinely in play,
+  with its remaining domain, default, `must_resolve` flag, and the registry's
+  `ask_priority` / `depends_on` presentation hints (so a sequential agent asks in the
+  intended order). Values are never trimmed *within* an entry; whole entries are filtered
+  out when the variable is no longer a decision: a domain of one value (or a numeric range
+  whose min equals its max, or an empty/null domain) is a settled fact about the survivors
+  that the candidates' BOM blocks already carry. **`must_resolve` entries always survive**,
+  whatever their domain size — with one legal value the caller must still actively settle
+  it, and hiding that would conceal the only thing blocking an orderable kitlist.
+  On a single-model lookup this filter removes ~60% of the field, all of it restatement.
 - `query_echo`: the fully-built constraint list actually solved (post-translation), so the
   agent can see what its demands expanded into.
 
