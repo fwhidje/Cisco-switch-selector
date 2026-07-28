@@ -8,7 +8,7 @@
 
 import { getVariable, dependsOn } from "../../selector/js/core/registry.js";
 
-export function trimResponse(res, query, registry, limit = 5) {
+export function trimResponse(res, query, registry, limit = 3) {
   const eliminated_summary = {};
   for (const e of res.eliminated)
     eliminated_summary[e.reason] = (eliminated_summary[e.reason] ?? 0) + 1;
@@ -17,6 +17,11 @@ export function trimResponse(res, query, registry, limit = 5) {
     registry_version: registry.registry_version,
     total_candidates: res.candidates.length,
     candidates: res.candidates.slice(0, limit),
+    // Every survivor's id, uncapped — read from the UNTRIMMED list, so it is the
+    // compensation for `limit` discarding candidates over the wire. Solver order
+    // is preserved (smallest sufficient config first), so the first `limit` ids
+    // are exactly the kitlists returned above in full. Never re-sort.
+    all_matches: res.candidates.map((c) => c.model.id),
     open_variables: res.open_variables.map((ov) => decorate(ov, registry)),
     eliminated_summary,
     query_echo: query,

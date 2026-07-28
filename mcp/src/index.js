@@ -69,7 +69,7 @@ function createServer() {
     {
       title: "Find Cisco switch kitlists from requirements",
       description:
-        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): turn a customer requirement set — port counts and speeds, PoE demand, PSU redundancy, stacking, management and licensing — into complete orderable kitlists (switch + fitted uplink module + PSUs + license SKUs + cables). State the whole ask in ONE call: anything you leave out is treated as 'don't care', not as a question to come back for. Returns matching kitlists in no preference order, capped at 'limit' with total_candidates reporting the full count — so a large total means the ask was underspecified, not that these few are the best. Every kitlist marks what it decided: 'defaulted' choices have real alternatives worth raising with the customer, and a 'required' decision is left deliberately blank with its options because the order is incomplete without it (licensing, normally — a switch ships with no license and needs one). Give demands as the customer states them (counts and levels); never pre-compute watts. At least one of requirements, poe_demand or port_demand must be supplied. If you already know the exact model id, use lookup_model instead.",
+        "Cisco enterprise switching (Catalyst C9200/C9300/C9350/C9500/C9550, Meraki MS): turn a customer requirement set — port counts and speeds, PoE demand, PSU redundancy, stacking, management and licensing — into complete orderable kitlists (switch + fitted uplink module + PSUs + license SKUs + cables). State the whole ask in ONE call: anything you leave out is treated as 'don't care', not as a question to come back for. Returns the top 'limit' kitlists in full detail (default 3, and 3 is usually right — each is dense), ordered smallest-sufficient-configuration first, plus all_matches: the SKU of every model that fits. Raise 'limit' only when you genuinely need more kitlists in full; to see what else exists read all_matches, and call lookup_model on any single SKU worth a closer look. Every kitlist marks what it decided: 'defaulted' choices have real alternatives worth raising with the customer, and a 'required' decision is left deliberately blank with its options because the order is incomplete without it (licensing, normally — a switch ships with no license and needs one). Give demands as the customer states them (counts and levels); never pre-compute watts. At least one of requirements, poe_demand or port_demand must be supplied. If you already know the exact model id, use lookup_model instead.",
       annotations: READ_ONLY,
       inputSchema: findKitlistsShape(registry),
     },
@@ -89,7 +89,7 @@ function createServer() {
       const problems = validateQuery(query, registry);
       if (problems.length) return fail({ error: "invalid query", problems }); // verbatim: the text names the legal values
 
-      return json(trimResponse(solve(query, kb, registry), query, registry, limit ?? 5));
+      return json(trimResponse(solve(query, kb, registry), query, registry, limit ?? 3));
     },
   );
 
