@@ -77,6 +77,16 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: npm ci
         working-directory: mcp
+      # Stamp the deployed commit into the bundle. Without this the server can
+      # only report registry_version, which does not move when code changes — so
+      # a client holding a cached tools/list looks identical to a failed deploy.
+      # Overwrites the "local" placeholder committed in src/build-info.js.
+      - name: Stamp build info
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          printf 'export const BUILD_SHA = "%s";\nexport const BUILD_TIME = "%s";\n' \
+            "${GITHUB_SHA::7}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > mcp/src/build-info.js
+          cat mcp/src/build-info.js
       - name: Deploy Worker (wrangler)
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3

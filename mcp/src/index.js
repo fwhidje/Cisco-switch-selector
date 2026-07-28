@@ -17,6 +17,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpHandler } from "agents/mcp";
 
 import { registry, kb } from "./data.js";
+import { BUILD_SHA, BUILD_TIME } from "./build-info.js";
 import { findKitlistsShape, lookupModelShape } from "./schema.js";
 import { trimResponse, nearestModels } from "./respond.js";
 import { solve, constraintCost } from "../../selector/js/core/solver.js";
@@ -35,10 +36,16 @@ const fail = (obj) => ({ ...json(obj), isError: true });
 // catalogue). Hosts use these to decide what may run without a prompt.
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
+// Semver build metadata: "3.0.0+a1b2c3d". registry_version alone cannot
+// distinguish two code deploys made against the same registry, which is exactly
+// how a client's cached tools/list once passed for a failed deploy. Clients
+// display this, so it is the cheapest place to make staleness visible.
+const SERVER_VERSION = `${registry.registry_version}+${BUILD_SHA}`;
+
 function createServer() {
   const server = new McpServer({
     name: "switch-selector",
-    version: registry.registry_version,
+    version: SERVER_VERSION,
   });
 
   server.registerTool(
@@ -108,11 +115,17 @@ function createServer() {
 export default {
   fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // Plain-text build banner: check what is actually deployed with a curl, no
+    // MCP handshake and no client cache in the way.
     if (url.pathname === "/" || url.pathname === "")
       return new Response(
-        "switch-selector MCP server (registry v" +
-          registry.registry_version +
-          "). MCP endpoint: POST /mcp (streamable HTTP).\n",
+        `switch-selector MCP server\n` +
+          `version:  ${SERVER_VERSION}\n` +
+          `registry: v${registry.registry_version}\n` +
+          `build:    ${BUILD_SHA}${BUILD_TIME ? ` (${BUILD_TIME})` : ""}\n` +
+          `endpoint: POST /mcp (streamable HTTP)\n` +
+          `\nIf a connected client shows older tool descriptions than this build, ` +
+          `its tools/list is cached from an earlier connection — reconnect it.\n`,
         { headers: { "content-type": "text/plain" } },
       );
     return createMcpHandler(createServer())(request, env, ctx);
