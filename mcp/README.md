@@ -29,6 +29,17 @@ Each kitlist marks what it decided (`bom.decisions`, contract §2.1): `pinned` /
 because a switch ships with no license and needs one. A `required` block returns
 `chosen: null` plus its full option space and is **never** given a manufactured default.
 
+`find_switch_kitlists` returns **`limit` kitlists in full (default 3)** — they are dense —
+alongside **`all_matches`**, the uncapped id of every model that fits, in the same
+(smallest-sufficient-first) order. The cap hides detail, never existence, so raising
+`limit` is rarely the right move: read `all_matches`, then `lookup_model` a specific SKU.
+
+**`constraint_cost`** reports, per constraint, how many extra models would survive without
+it (leave-one-out, contract §2.2) — so the top row is what is actually costing you, and a
+zero means every survivor already satisfies it. The values overlap and **must not be
+summed**. It replaces the old `eliminated_summary`, whose reason counts measured
+evaluation order rather than cost.
+
 **Tool descriptions are load-bearing** — they are the entire interface a calling agent sees.
 Each carries, in order: domain anchor, scope (the loaded families), trigger, and a
 cross-reference to its sibling. Treat edits to them as interface changes, not copy edits.

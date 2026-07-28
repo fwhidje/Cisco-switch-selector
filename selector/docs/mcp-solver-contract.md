@@ -66,6 +66,22 @@ default to fill it, and never let a caller read a blank as "nothing needed here"
 The envelope is **additive**: no pre-existing block field is renamed or removed, so every
 existing renderer keeps working unchanged.
 
+### 2.2 Derived projections are separate exports, never inside `solve()`
+
+`solve()` stays one pass over the pool. Projections that need extra solves are exported
+alongside it, so a caller pays only for what it reads:
+
+- `facetDomains(query, kb, registry, mainResult)` — live values per variable, re-solving
+  without each pinned variable's own constraints (the UI's greyed-out options).
+- `constraintCost(query, kb, registry, mainResult)` — leave-one-out attrition: per
+  constraint, how many ADDITIONAL models survive without it. Order-independent, and
+  `recovers: 0` is meaningful ("every survivor already satisfies this").
+  **`recovers` values do not sum** — constraints overlap, and a model excluded by three of
+  them is recovered by none individually. Any renderer must say so.
+
+This matters because the web UI re-solves on interaction; folding N extra solves into
+`solve()` would tax every caller for a projection only the MCP server reads.
+
 ## 3. The IO seam: `mergeKBs`
 
 The server bundles all data at build time (wrangler bundles JSON imports); nothing is fetched
@@ -104,7 +120,7 @@ Input (all fields optional, at least one required):
 | `requirements` | `[{variable, condition, value}]` | verbatim registry vocabulary → `constraint()` |
 | `poe_demand` | `[{count, level}]` | → `translatePoeDemand()` (never agent-side) |
 | `port_demand` | `[{count, speed, role?, medium?}]` | → `portConstraint({role?, medium?, speed}, ">=", count)` |
-| `limit` | integer, default 5 | candidate cap (§5) |
+| `limit` | integer, default 3 | cap on kitlists returned in FULL (§5); `all_matches` is uncapped |
 
 Flow: build via `query.js` → `validateQuery` (problems → tool error, verbatim) → `solve` →
 trim (§5). The input schema enumerates, per variable, its legal values and accepted conditions
@@ -115,9 +131,19 @@ deliberate addition.
 
 ## 5. Response trimming (transport shaping, not logic)
 
-- `candidates`: at most `limit` (default 5), in solver order, each with its **full** resolved
-  BOM; plus `total_candidates` so the agent knows what the cap hid. The server never reorders.
-- `eliminated`: compressed to `{reason → count}`; the full per-model list is not shipped.
+- `candidates`: at most `limit` (default 3), in solver order, each with its **full** resolved
+  BOM; plus `total_candidates` so the agent knows what the cap hid. The server never reorders
+  — but note the core's order is *not* arbitrary: `rank()` runs unconditionally
+  (`solver.js`) and, absent soft constraints, sorts smallest-sufficient-configuration first.
+- `all_matches`: every survivor's model id, **uncapped**, taken from the untrimmed candidate
+  list. This is what makes a small `limit` safe — the cap hides detail, never existence.
+  Same order as `candidates`, so the first `limit` ids are the kitlists shown in full.
+- `constraint_cost`: from `constraintCost()` (§2.2). Computed by the core and passed into
+  `trimResponse` — the server has no `kb` and must not acquire one. Omitted for
+  `lookup_model`, where leave-one-out over a single `model_id ==` says nothing useful.
+- `eliminated`: **not shipped.** The former `eliminated_summary` (`{reason → count}`) was
+  removed: it counted each model against the FIRST constraint it failed, making the numbers
+  evaluation-order artifacts rather than costs. `constraint_cost` replaces it.
 - `open_variables`: **whole and untrimmed**, including each variable's remaining domain,
   default, `must_resolve` flag, and the registry's `ask_priority` / `depends_on` presentation
   hints (so a sequential agent asks in the intended order).

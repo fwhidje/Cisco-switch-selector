@@ -8,12 +8,13 @@
 
 import { getVariable, dependsOn } from "../../selector/js/core/registry.js";
 
-export function trimResponse(res, query, registry, limit = 3) {
-  const eliminated_summary = {};
-  for (const e of res.eliminated)
-    eliminated_summary[e.reason] = (eliminated_summary[e.reason] ?? 0) + 1;
-
-  return {
+/** `constraint_cost` is computed by the CORE (solver.constraintCost) and passed
+ *  in — this function has no `kb` and must not acquire selection logic. Omit it
+ *  for lookup_model: with `model_id ==` as the only constraint, leave-one-out
+ *  would solve the empty query and report "relaxing this recovers 236", which is
+ *  noise rather than a relaxation hint. */
+export function trimResponse(res, query, registry, limit = 3, constraint_cost = null) {
+  const out = {
     registry_version: registry.registry_version,
     total_candidates: res.candidates.length,
     candidates: res.candidates.slice(0, limit),
@@ -23,9 +24,10 @@ export function trimResponse(res, query, registry, limit = 3) {
     // are exactly the kitlists returned above in full. Never re-sort.
     all_matches: res.candidates.map((c) => c.model.id),
     open_variables: res.open_variables.map((ov) => decorate(ov, registry)),
-    eliminated_summary,
-    query_echo: query,
   };
+  if (constraint_cost) out.constraint_cost = constraint_cost;
+  out.query_echo = query;
+  return out;
 }
 
 function decorate(ov, registry) {
