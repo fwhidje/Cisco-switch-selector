@@ -74,6 +74,29 @@ at runtime). Until the secrets exist the deploy job skips with a notice. Manual 
 
 The server URL is `https://switch-selector-mcp.<your-subdomain>.workers.dev/mcp`.
 
+### Which build is live?
+
+`curl` the root path — it answers without an MCP handshake and without any client cache
+in the way:
+
+```
+switch-selector MCP server
+version:  3.0.0+a1b2c3d      <- registry version + deployed commit
+registry: v3.0.0
+build:    a1b2c3d (2026-07-28T13:26:25Z)
+endpoint: POST /mcp (streamable HTTP)
+```
+
+The same `registry+commit` string is the MCP server `version`, so a client can see it too.
+A build reporting `local` was not stamped by CI (local `wrangler dev`, or a manual
+`npm run deploy`) — that means "unstamped", not "stale".
+
+**If a connected client shows older tool descriptions than the live build, that is a
+client-side cache, not a failed deploy.** MCP clients fetch `tools/list` once when they
+connect and hold it for the session; a redeploy never reaches an already-connected client.
+Reconnect it — a new chat, or toggle the connector off and on. Check the banner first
+before suspecting CI.
+
 ## Connect an agent
 
 - **Claude Code**: `claude mcp add --transport http switch-selector <url>`

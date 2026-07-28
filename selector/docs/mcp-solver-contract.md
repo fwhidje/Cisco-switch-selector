@@ -165,9 +165,19 @@ inferred from `limit`, so each call site declares what its tool returns. Shape i
 
 ## 6. Versioning & deployment invariants
 
-- The server reports the `registry_version` it was built against (from the bundled registry)
-  in its server metadata; a registry variable-set change (expensive by the change policy)
-  implies reviewing the generated tool schemas.
+- The server reports **`<registry_version>+<commit>`** in its server metadata (e.g.
+  `3.0.0+a1b2c3d`), and the same on the plain-text banner at `/`. The registry half moves
+  when the vocabulary changes — a registry variable-set change (expensive by the change
+  policy) implies reviewing the generated tool schemas. The commit half exists because
+  registry version **alone cannot distinguish two code deploys**: consecutive deploys
+  against an unchanged registry all announced the same version, which made a client's
+  cached `tools/list` indistinguishable from a failed deploy. CI stamps
+  `mcp/src/build-info.js` immediately before `wrangler deploy`; the committed placeholder
+  reports `local`, so `local` means "not built by CI", never "stale".
+- **Tool definitions are cached client-side.** MCP clients fetch `tools/list` once at
+  connect time and hold it. A redeploy does not reach an already-connected client — it
+  must reconnect. Compare the client's view against `curl <worker>/` before suspecting
+  the deploy.
 - CI ordering: `validate-kb.mjs` must pass before any deploy — a KB snapshot that fails
   validation never ships.
 - A deploy is a snapshot: KB edits reach the server only through redeploy (automated in CI on
