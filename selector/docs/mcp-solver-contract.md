@@ -73,11 +73,6 @@ alongside it, so a caller pays only for what it reads:
 
 - `facetDomains(query, kb, registry, mainResult)` — live values per variable, re-solving
   without each pinned variable's own constraints (the UI's greyed-out options).
-- `constraintCost(query, kb, registry, mainResult)` — leave-one-out attrition: per
-  constraint, how many ADDITIONAL models survive without it. Order-independent, and
-  `recovers: 0` is meaningful ("every survivor already satisfies this").
-  **`recovers` values do not sum** — constraints overlap, and a model excluded by three of
-  them is recovered by none individually. Any renderer must say so.
 
 This matters because the web UI re-solves on interaction; folding N extra solves into
 `solve()` would tax every caller for a projection only the MCP server reads.
@@ -139,17 +134,14 @@ deliberate addition.
   list. This is what makes a small `limit` safe — the cap hides detail, never existence.
   Same order as `candidates`, so the first `limit` ids are the kitlists shown in full.
   Omitted for `lookup_model`: "every model matching `model_id == X`" is `[X]`.
-- `constraint_cost`: from `constraintCost()` (§2.2). Computed by the core and passed into
-  `trimResponse` — the server has no `kb` and must not acquire one. Omitted for
-  `lookup_model`, where leave-one-out over a single `model_id ==` says nothing useful.
 
 The two tools therefore ship **different shapes**, and that is deliberate: the differences
-are named options on `trimResponse` (`{limit, constraintCost, allMatches}`) rather than
+are named options on `trimResponse` (`{limit, allMatches}`) rather than
 inferred from `limit`, so each call site declares what its tool returns. Shape is stable
 *per tool*, which is what a caller actually depends on.
 - `eliminated`: **not shipped.** The former `eliminated_summary` (`{reason → count}`) was
   removed: it counted each model against the FIRST constraint it failed, making the numbers
-  evaluation-order artifacts rather than costs. `constraint_cost` replaces it.
+  evaluation-order artifacts rather than costs.
 - `open_variables`: the **open decision space** — every variable still genuinely in play,
   with its remaining domain, default, `must_resolve` flag, and the registry's
   `ask_priority` / `depends_on` presentation hints (so a sequential agent asks in the
