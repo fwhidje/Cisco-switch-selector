@@ -116,7 +116,9 @@ if (toAdd.length) {
   for (const id of toAdd) console.log(`    ${id}`);
 }
 if (orphanIds.length) {
-  console.log(`\n⚠ ${orphanIds.length} orphan orderable SKU(s) (referenced in configurables, not in any catalog):`);
+  console.log(
+    `\n⚠ ${orphanIds.length} orphan orderable SKU(s) (referenced in configurables, not in any catalog):`,
+  );
   for (const o of orphanIds) console.log(`    ${o.id}  (${o.family})`);
 }
 if (warnings.length) {
@@ -133,7 +135,9 @@ if (CHECK) {
   }
   const drift = toAdd.length + stale.length;
   if (drift) {
-    console.log(`\n✗ list-prices.json is out of sync (${toAdd.length} to add, ${stale.length} stale). Run \`npm run prices\`.`);
+    console.log(
+      `\n✗ list-prices.json is out of sync (${toAdd.length} to add, ${stale.length} stale). Run \`npm run prices\`.`,
+    );
     process.exit(1);
   }
   console.log(`\n✓ list-prices.json is in sync.`);
