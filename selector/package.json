@@ -6,7 +6,8 @@
   "description": "Networking equipment selector — pure query/response engine over configurations + facet UI (Stage 1). Static, no build step.",
   "scripts": {
     "serve": "python3 -m http.server",
-    "validate": "node tools/validate-kb.mjs"
+    "validate": "node tools/validate-kb.mjs",
+    "prices": "node tools/build-prices.mjs"
   },
   "devDependencies": {
     "ajv": "^8.20.0",
