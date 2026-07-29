@@ -42,12 +42,6 @@ candidates' BOM blocks already carry, and are filtered out. `must_resolve` entri
 survive regardless of domain size — with one legal value the caller must still settle it,
 and hiding that would conceal the only thing blocking an orderable kitlist.
 
-**`constraint_cost`** reports, per constraint, how many extra models would survive without
-it (leave-one-out, contract §2.2) — so the top row is what is actually costing you, and a
-zero means every survivor already satisfies it. The values overlap and **must not be
-summed**. It replaces the old `eliminated_summary`, whose reason counts measured
-evaluation order rather than cost.
-
 **Tool descriptions are load-bearing** — they are the entire interface a calling agent sees.
 Each carries, in order: domain anchor, scope (the loaded families), trigger, and a
 cross-reference to its sibling. Treat edits to them as interface changes, not copy edits.

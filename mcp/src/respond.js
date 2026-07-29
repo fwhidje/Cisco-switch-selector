@@ -14,16 +14,11 @@ import { getVariable, dependsOn } from "../../selector/js/core/registry.js";
  * different response shapes, so the per-tool differences are NAMED options
  * rather than inferred from `limit`:
  *
- * - `constraintCost` is computed by the CORE (solver.constraintCost) and passed
- *   in — this function has no `kb` and must not acquire selection logic.
- *   lookup_model omits it: with `model_id ==` as the only constraint,
- *   leave-one-out would solve the empty query and report "relaxing this recovers
- *   236", which is noise rather than a relaxation hint.
  * - `allMatches` is off for lookup_model: "every model matching model_id == X"
  *   is [X], which tells the caller only what it just asked.
  */
 export function trimResponse(res, query, registry, opts = {}) {
-  const { limit = 3, constraintCost = null, allMatches = true } = opts;
+  const { limit = 3, allMatches = true } = opts;
   const out = {
     registry_version: registry.registry_version,
     total_candidates: res.candidates.length,
@@ -35,7 +30,6 @@ export function trimResponse(res, query, registry, opts = {}) {
   // are exactly the kitlists returned above in full. Never re-sort.
   if (allMatches) out.all_matches = res.candidates.map((c) => c.model.id);
   out.open_variables = res.open_variables.filter(isOpen).map((ov) => decorate(ov, registry));
-  if (constraintCost) out.constraint_cost = constraintCost;
   out.query_echo = query;
   return out;
 }

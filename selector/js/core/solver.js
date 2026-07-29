@@ -18,13 +18,11 @@
 //                   default rule, and must_resolve where no safe default exists.
 //   eliminated      models removed, each with the FIRST violated constraint —
 //                   an attribution, not a cost. Counting these by reason measures
-//                   evaluation order, not what a constraint excludes; use
-//                   constraintCost() for that.
+//                   evaluation order, not what a constraint excludes.
 //
 // Derived projections that need extra solves are SEPARATE exports, never folded
 // in here, so a caller pays only for what it reads (the web UI re-solves on
-// interaction): facetDomains() for live per-variable values, constraintCost()
-// for leave-one-out attrition per constraint.
+// interaction): facetDomains() for live per-variable values.
 //
 // The engine checks port demand against each model's uplink VARIANTS via
 // pool-feasibility (a model survives if some fitted uplink option makes the
@@ -342,43 +340,6 @@ export function facetDomains(query, kb, registry, mainResult) {
     if (ov && Array.isArray(ov.domain)) domains.set(v.name, new Set(ov.domain));
   }
   return domains;
-}
-
-/**
- * What each constraint in the query actually COSTS, by leave-one-out: for every
- * constraint, re-solve without it and report how many ADDITIONAL models survive.
- * Answers "did one thing wipe out most of my options, and what would relaxing it
- * buy me" — e.g. a 10x SFP+ demand that drops everything but full-fiber switches.
- *
- * Why not just count eliminations by reason: an eliminated model records only the
- * FIRST constraint it failed, so those counts are evaluation-ORDER artifacts — a
- * constraint checked late looks cheap purely because earlier ones already killed
- * those models, and a constraint nothing died on first is missing entirely rather
- * than reported as free. Leave-one-out is order-independent, and a `recovers: 0`
- * is real information ("every survivor already does this").
- *
- * CAUTION for renderers: `recovers` values DO NOT SUM to the eliminated total.
- * Constraints overlap, and a model excluded by three of them is recovered by none
- * of them individually.
- *
- * Separate export, deliberately NOT folded into solve() — same reasoning as
- * facetDomains: it costs one extra solve per constraint, and callers that re-solve
- * on every interaction (the web UI) must not pay for a projection they never read.
- */
-export function constraintCost(query, kb, registry, mainResult) {
-  const cons = query ?? [];
-  const surviving = (mainResult ?? solve(cons, kb, registry)).candidates.length;
-  const per_constraint = cons.map((c, i) => ({
-    constraint: c.where ? portDemandText([c]) : describe(c),
-    recovers:
-      solve(
-        cons.filter((_, k) => k !== i),
-        kb,
-        registry,
-      ).candidates.length - surviving,
-  }));
-  per_constraint.sort((a, b) => b.recovers - a.recovers);
-  return { pool: getModels(kb).length, surviving, per_constraint };
 }
 
 // --- ranking -----------------------------------------------------------------
