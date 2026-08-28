@@ -1,25 +1,26 @@
 // build-prices.mjs — Cisco SKU -> list-price map generator / updater.
 //
 // This tool does NOT price anything. It scrapes every family knowledge base for
-// the set of real, orderable Cisco SKUs and maintains two hand-filled maps under
+// the set of real, orderable Cisco SKUs and maintains one hand-filled CSV under
 // DB/switching/:
 //
-//   list-prices.json     — hardware & components: { "<SKU>": <price|null> }.
-//                          Absolute USD list price.
-//
-//   license-prices.json  — licenses, split by pricing basis:
-//     { "subscription_monthly": { "<SKU>": <price|null> },   // 1-MONTH list price
-//       "absolute":            { "<SKU>": <price|null> } }    // full list price
-//     Subscriptions whose duration is NOT baked into the SKU (Cisco `unified` and
-//     `meraki-subscription`, i.e. catalog shape "subscription-based") are the
-//     one-SKU-variable-duration items: they carry a 1-MONTH rate that downstream
-//     logic multiplies by the chosen term. Everything else — perpetual licenses
-//     and term-based SKUs whose duration is in the id (…-3Y, …-1Y) — is absolute.
+//   prices.csv — one row per SKU: sku,category,price
+//     category is one of:
+//       hardware              — hardware & components. Absolute USD list price.
+//       subscription_monthly  — licenses whose duration is NOT baked into the
+//                                SKU (Cisco `unified` and `meraki-subscription`,
+//                                i.e. catalog shape "subscription-based"): a
+//                                1-MONTH list price that downstream logic
+//                                multiplies by the chosen term.
+//       fixed_term             — every other license: perpetual licenses and
+//                                term-based SKUs whose duration is in the id
+//                                (…-3Y, …-1Y). Full list price.
+//     price is blank for not-yet-priced SKUs (CSV equivalent of JSON null).
 //
 // Prices are entered BY HAND. Re-run this whenever Cisco adds/removes products:
-// new SKUs are appended as null (preserving every price already entered), and
-// SKUs that vanished from the KBs are reported and removed only after
-// confirmation.
+// new SKUs are appended with a blank price (preserving every price already
+// entered), and SKUs that vanished from the KBs are reported and removed only
+// after confirmation.
 //
 // SKUs are identified BY JSON PATH, never by regex — within a KB the `id` field
 // names both real SKUs (C9550-24L4CD) and lowercase internal group ids
@@ -44,19 +45,35 @@ import { createInterface } from "node:readline";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SWITCHING = resolvePath(HERE, "../../DB/switching");
-const PRICES_PATH = resolvePath(SWITCHING, "list-prices.json");
-const LICENSE_PATH = resolvePath(SWITCHING, "license-prices.json");
+const PRICE_CSV_PATH = resolvePath(SWITCHING, "prices.csv");
 const readJSON = (fullPath) => JSON.parse(readFileSync(fullPath, "utf8"));
 const rel = (p) => p.replace(resolvePath(HERE, "../.."), ".");
 const cmp = (a, b) => a.localeCompare(b);
+
+// prices.csv rows: sku,category,price (blank price = not yet priced).
+const parseCSV = (text) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line, i) => line && i > 0) // skip header + blank lines
+    .map((line) => {
+      const [sku, category, price] = line.split(",");
+      return { sku, category, price: price === "" || price === undefined ? null : Number(price) };
+    });
+const formatCSV = (rows) => {
+  const lines = ["sku,category,price"];
+  for (const { sku, category, price } of rows)
+    lines.push(`${sku},${category},${price === null ? "" : price}`);
+  return lines.join("\n") + "\n";
+};
 
 const args = new Set(process.argv.slice(2));
 const AUTO_YES = args.has("--yes") || args.has("-y");
 const CHECK = args.has("--check");
 
-// License-file sections, in output order.
+// License categories, in output order.
 const SUB = "subscription_monthly";
-const ABS = "absolute";
+const ABS = "fixed_term";
 
 // A *-NONE configurator sentinel ("remove the category"), not an orderable SKU.
 // Match the suffix specifically: C9200-NM-BLANK is a real none_option and stays.
@@ -121,20 +138,21 @@ for (const { series, dir, kbFile } of families) {
   }
 }
 
-// --- read existing files ----------------------------------------------------
+// --- read existing file ------------------------------------------------------
 
-const existingHw = existsSync(PRICES_PATH) ? readJSON(PRICES_PATH) : {};
+const existingRows = existsSync(PRICE_CSV_PATH)
+  ? parseCSV(readFileSync(PRICE_CSV_PATH, "utf8"))
+  : [];
 
-// license-prices.json is sectioned; flatten to id->price, and remember which
-// section each existing id lived in (used to keep declined-stale entries put).
-const existingLicRaw = existsSync(LICENSE_PATH) ? readJSON(LICENSE_PATH) : {};
+const existingHw = {};
 const existingLic = {};
-const existingLicSection = new Map();
-for (const [section, map] of Object.entries(existingLicRaw)) {
-  if (!map || typeof map !== "object") continue;
-  for (const [id, price] of Object.entries(map)) {
-    existingLic[id] = price;
-    existingLicSection.set(id, section);
+const existingLicSection = new Map(); // id -> category (used to keep declined-stale entries put)
+for (const { sku, category, price } of existingRows) {
+  if (category === "hardware") {
+    existingHw[sku] = price;
+  } else {
+    existingLic[sku] = price;
+    existingLicSection.set(sku, category);
   }
 }
 
@@ -169,8 +187,8 @@ console.log(
   `Scanned ${families.length} families → ${hardware.size} hardware SKUs, ${licIds.size} licenses.`,
 );
 console.log(
-  `Existing: list-prices ${hwKeys.size} (${pricedCount(existingHw)} priced), ` +
-    `license-prices ${licKeys.size} (${pricedCount(existingLic)} priced).`,
+  `Existing: hardware ${hwKeys.size} (${pricedCount(existingHw)} priced), ` +
+    `licenses ${licKeys.size} (${pricedCount(existingLic)} priced).`,
 );
 
 const listBlock = (label, ids, fmt = (id) => id) => {
@@ -178,13 +196,13 @@ const listBlock = (label, ids, fmt = (id) => id) => {
   console.log(`\n${label} (${ids.length}):`);
   for (const id of ids) console.log(`    ${fmt(id)}`);
 };
-listBlock("+ new hardware SKU(s) → list-prices.json (null)", hwAdd);
+listBlock("+ new hardware SKU(s) → prices.csv (blank price)", hwAdd);
 listBlock(
-  `+ new license SKU(s) → license-prices.json (null)`,
+  `+ new license SKU(s) → prices.csv (blank price)`,
   licAdd,
   (id) => `${id}  [${licenseOf.get(id)}]`,
 );
-listBlock("→ license SKU(s) moved out of list-prices.json (price carried over)", moved);
+listBlock("→ license SKU(s) moved from hardware to a license category (price carried over)", moved);
 if (orphanIds.length) {
   console.log(
     `\n⚠ orphan orderable SKU(s) (referenced in configurables, not in any catalog) (${orphanIds.length}):`,
@@ -197,38 +215,38 @@ if (warnings.length) {
 }
 
 const staleAll = [
-  ...hwStale.map((id) => ({ id, file: "list-prices.json", price: existingHw[id] })),
-  ...licStale.map((id) => ({ id, file: "license-prices.json", price: existingLic[id] })),
+  ...hwStale.map((id) => ({ id, category: "hardware", price: existingHw[id] })),
+  ...licStale.map((id) => ({ id, category: existingLicSection.get(id), price: existingLic[id] })),
 ];
 
 // --- check mode: report drift, write nothing --------------------------------
 
 if (CHECK) {
   if (staleAll.length) {
-    console.log(`\n- stale SKU(s) (in a price file, no longer in any KB) (${staleAll.length}):`);
+    console.log(`\n- stale SKU(s) (in prices.csv, no longer in any KB) (${staleAll.length}):`);
     for (const s of staleAll)
-      console.log(`    ${s.id}  (${s.file}, price: ${JSON.stringify(s.price)})`);
+      console.log(`    ${s.id}  (${s.category}, price: ${JSON.stringify(s.price)})`);
   }
   const drift = hwAdd.length + licAdd.length + moved.length + staleAll.length;
   if (drift) {
     console.log(
-      `\n✗ price files out of sync (` +
+      `\n✗ prices.csv out of sync (` +
         `${hwAdd.length + licAdd.length} to add, ${moved.length} to move, ${staleAll.length} stale). ` +
         `Run \`npm run prices\`.`,
     );
     process.exit(1);
   }
-  console.log(`\n✓ price files are in sync.`);
+  console.log(`\n✓ prices.csv is in sync.`);
   process.exit(0);
 }
 
-// --- write mode: confirm stale removals, then write both files --------------
+// --- write mode: confirm stale removals, then write the file ----------------
 
 async function confirmStale() {
   if (!staleAll.length) return new Set();
-  console.log(`\n- stale SKU(s) (in a price file, no longer in any KB) (${staleAll.length}):`);
+  console.log(`\n- stale SKU(s) (in prices.csv, no longer in any KB) (${staleAll.length}):`);
   for (const s of staleAll)
-    console.log(`    ${s.id}  (${s.file}, price: ${JSON.stringify(s.price)})`);
+    console.log(`    ${s.id}  (${s.category}, price: ${JSON.stringify(s.price)})`);
   if (AUTO_YES) {
     console.log(`  --yes: removing all ${staleAll.length}.`);
     return new Set(staleAll.map((s) => s.id));
@@ -245,16 +263,15 @@ async function confirmStale() {
 
 const toRemove = await confirmStale();
 
-// Hardware file: current hardware SKUs + any declined-stale still kept. Moved
-// licenses are always dropped here (they now live in license-prices.json).
+// Hardware rows: current hardware SKUs + any declined-stale still kept. Moved
+// licenses are always dropped here (they now belong to a license category).
 const hwFinalIds = new Set(hardware);
 for (const id of hwStale) if (!toRemove.has(id)) hwFinalIds.add(id);
 const hwOut = {};
 for (const id of [...hwFinalIds].sort(cmp)) hwOut[id] = existingHw[id] ?? null;
-writeFileSync(PRICES_PATH, JSON.stringify(hwOut, null, 2) + "\n");
 
-// License file: sectioned. Desired licenses by their computed section, plus any
-// declined-stale kept in whichever section they were in before.
+// License rows: desired licenses by their computed category, plus any
+// declined-stale kept in whichever category they were in before.
 const sectionIds = { [SUB]: new Set(), [ABS]: new Set() };
 for (const [id, section] of licenseOf) sectionIds[section].add(id);
 for (const id of licStale) {
@@ -267,7 +284,14 @@ for (const section of [SUB, ABS]) {
   licOut[section] = {};
   for (const id of [...sectionIds[section]].sort(cmp)) licOut[section][id] = priorPrice(id);
 }
-writeFileSync(LICENSE_PATH, JSON.stringify(licOut, null, 2) + "\n");
+
+const outRows = [
+  ...Object.entries(hwOut).map(([sku, price]) => ({ sku, category: "hardware", price })),
+  ...[SUB, ABS].flatMap((section) =>
+    Object.entries(licOut[section]).map(([sku, price]) => ({ sku, category: section, price })),
+  ),
+];
+writeFileSync(PRICE_CSV_PATH, formatCSV(outRows));
 
 // --- summary ----------------------------------------------------------------
 
@@ -275,9 +299,8 @@ const summarize = (name, map) => {
   const nulls = Object.values(map).filter((v) => v === null).length;
   return `${name}: ${Object.keys(map).length} SKUs, ${Object.keys(map).length - nulls} priced, ${nulls} need a price`;
 };
-console.log(`\n✓ Wrote ${rel(PRICES_PATH)} — ${summarize("hardware", hwOut)}.`);
 console.log(
-  `✓ Wrote ${rel(LICENSE_PATH)} — ` +
-    `${summarize(SUB, licOut[SUB])}; ${summarize(ABS, licOut[ABS])}.` +
+  `\n✓ Wrote ${rel(PRICE_CSV_PATH)} — ` +
+    `${summarize("hardware", hwOut)}; ${summarize(SUB, licOut[SUB])}; ${summarize(ABS, licOut[ABS])}.` +
     (toRemove.size ? `  (${toRemove.size} stale removed.)` : ""),
 );
